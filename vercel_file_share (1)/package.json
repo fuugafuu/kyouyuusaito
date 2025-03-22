@@ -1,0 +1,13 @@
+{
+  "name": "file-share",
+  "version": "1.0.0",
+  "description": "ファイル共有サイト",
+  "main": "server.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "multer": "^1.4.3"
+  }
+}
