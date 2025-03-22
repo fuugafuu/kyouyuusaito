@@ -1,24 +1,10 @@
 const multer = require('multer');
-const fs = require('fs');
 const path = require('path');
 
-// Vercelはローカルファイルシステムを永続的に保存できないため、外部ストレージを使用するのが推奨されます。
-// ここではローカルに保存する処理例を記述しますが、Vercelでの運用ではS3やGoogle Cloud Storageなどの外部ストレージを使ってください。
+// Vercelでは、ローカルのファイルシステムを永続的に使用できません。
+// 代わりに、外部のストレージサービス（Amazon S3やGoogle Cloud Storage）を使用することを推奨します。
 
-const uploadFolder = '/tmp/uploads'; // Vercelの一時ストレージ
-
-if (!fs.existsSync(uploadFolder)) {
-  fs.mkdirSync(uploadFolder);
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadFolder);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
+const storage = multer.memoryStorage(); // メモリ内に保存する
 
 const upload = multer({ storage: storage });
 
@@ -31,7 +17,7 @@ module.exports = (req, res) => {
 
       res.status(200).json({
         message: 'ファイルアップロード成功',
-        fileUrl: `/uploads/${req.file.filename}`,
+        fileName: req.file.originalname,
       });
     });
   } else {
