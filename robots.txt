@@ -1,4 +1,12 @@
 User-agent: *
 Allow: /
+Disallow: /studio
+Disallow: /s
+Disallow: /main
+Disallow: /share
+Disallow: /public
+Disallow: /public-site
+Disallow: /admin
+Disallow: /clearance-7f3d9q
 
 Sitemap: https://kyouyuusaito.vercel.app/sitemap.xml

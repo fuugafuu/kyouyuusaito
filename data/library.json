@@ -1,0 +1,39 @@
+{
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "siteTitle": "Sandwich Box Archive",
+  "articles": [
+    {
+      "slug": "scp-002",
+      "title": "待機室の壁面体",
+      "designation": "SCP-002",
+      "series": "SCP",
+      "articleNumber": 2,
+      "objectClass": "Euclid",
+      "summary": "居住空間のような内部構造を持つ異常物体。公開閲覧向けに再構成したサンプル記事です。",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": true
+    },
+    {
+      "slug": "scp-017",
+      "title": "光喰いの影",
+      "designation": "SCP-017",
+      "series": "SCP",
+      "articleNumber": 17,
+      "objectClass": "Keter",
+      "summary": "暗所で活性化する影状存在。一覧表示とモバイル検証用に追加した短編サンプルです。",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": false
+    },
+    {
+      "slug": "scp-093",
+      "title": "赤い海の鏡片",
+      "designation": "SCP-093",
+      "series": "SCP",
+      "articleNumber": 93,
+      "objectClass": "Euclid",
+      "summary": "分類・一覧・短URL動線を確認するための公開用ヂミー記事です。",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": false
+    }
+  ]
+}
