@@ -14,10 +14,6 @@
       "destination": "/share/index.html"
     },
     {
-      "source": "/public",
-      "destination": "/public-site/index.html"
-    },
-    {
       "source": "/admin",
       "destination": "/admin/index.html"
     }
