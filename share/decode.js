@@ -6,6 +6,10 @@ import { decodeBase64Utf8, readHashParam } from '../common/utils.js';
 const DIRECT_TOKEN_PATTERN = /\b(?:raw|lzw)\.[A-Za-z0-9_-]+\b/;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 
+function normalizeUrlCandidate(value) {
+  return String(value || '').replace(/[),.!?。、】【」』＞>]+$/g, '');
+}
+
 function assertSharePayloadShape(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('共有データの形式が不正です。');
@@ -47,7 +51,7 @@ export function extractShareTokenFromText(text) {
 
   if (/^https?:\/\//i.test(source)) {
     try {
-      const parsed = new URL(source);
+      const parsed = new URL(normalizeUrlCandidate(source));
       return (
         parsed.searchParams.get(SHARE_QUERY_KEY) ||
         readHashParam(SHARE_QUERY_KEY, parsed.hash) ||
@@ -55,7 +59,7 @@ export function extractShareTokenFromText(text) {
         ''
       );
     } catch {
-      return '';
+      // URLらしい文字列でも装飾が混ざることがあるため、下の走査へフォールバックする。
     }
   }
 
@@ -66,7 +70,7 @@ export function extractShareTokenFromText(text) {
 
   for (const match of source.matchAll(URL_PATTERN)) {
     try {
-      const parsed = new URL(match[0]);
+      const parsed = new URL(normalizeUrlCandidate(match[0]));
       const token =
         parsed.searchParams.get(SHARE_QUERY_KEY) ||
         readHashParam(SHARE_QUERY_KEY, parsed.hash) ||
