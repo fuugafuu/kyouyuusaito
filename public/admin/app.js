@@ -1,12 +1,6 @@
-import {
-  clearAdminSession,
-  hasAdminPasscode,
-  isAdminSessionActive,
-  setAdminPasscode,
-  verifyAdminPasscode,
-} from '../common/admin-auth.js';
 import { runPublicationAudit } from '../common/moderation.js';
 import { buildArticleDesignation, buildArticleSlug, buildPublicBundle, getPublicWarnings } from '../common/publication.js';
+import { getStudioUrl } from '../common/routes.js';
 import { copyText, ensureUserKey, formatDateTime, serializeError } from '../common/utils.js';
 import { createStorageService } from '../main/storage.js';
 
@@ -14,9 +8,7 @@ const refs = {
   status: document.querySelector('#adminStatus'),
   gateSection: document.querySelector('#adminGateSection'),
   workspace: document.querySelector('#adminWorkspace'),
-  setupInput: document.querySelector('#adminSetupInput'),
-  setupConfirmInput: document.querySelector('#adminSetupConfirmInput'),
-  setupButton: document.querySelector('#adminSetupButton'),
+  usernameInput: document.querySelector('#adminUsernameInput'),
   loginInput: document.querySelector('#adminLoginInput'),
   loginButton: document.querySelector('#adminLoginButton'),
   logoutButton: document.querySelector('#adminLogoutButton'),
@@ -76,7 +68,7 @@ function renderQueue() {
   refs.articleList.innerHTML = '';
 
   if (!state.articles.length) {
-    renderEmptyList(refs.articleList, 'まだ記事がありません。');
+    renderEmptyList(refs.articleList, 'この端末にはまだ記事がありません。');
     return;
   }
 
@@ -96,7 +88,7 @@ function renderQueue() {
 
     const note = document.createElement('span');
     note.className = 'muted-text';
-    note.textContent = article.moderationReport?.summary || '審査結果なし';
+    note.textContent = article.moderationReport?.summary || 'まだ審査していません。';
 
     button.append(title, meta, note);
     refs.articleList.appendChild(button);
@@ -130,7 +122,7 @@ function renderIssues(report) {
 function renderWarnings(warnings = []) {
   refs.warningList.innerHTML = '';
   if (!warnings.length) {
-    renderEmptyList(refs.warningList, '公開URL生成時の追加警告はありません。');
+    renderEmptyList(refs.warningList, '公開URL生成時の注意はありません。');
     return;
   }
 
@@ -157,9 +149,9 @@ function renderSelectedArticle() {
   refs.openEditorButton.disabled = !article;
 
   if (!article) {
-    refs.selectedTitle.textContent = '記事を選んでください';
+    refs.selectedTitle.textContent = '記事を選択してください';
     refs.selectedMeta.textContent = 'ここに記事の公開情報が表示されます。';
-    refs.selectedSummary.textContent = 'ローカル審査の結果、公開URL、公開警告を確認できます。';
+    refs.selectedSummary.textContent = 'ローカル審査結果、公開URL、注意事項をここで確認できます。';
     refs.publicUrl.value = '';
     renderIssues(null);
     renderWarnings([]);
@@ -171,8 +163,8 @@ function renderSelectedArticle() {
   refs.selectedSummary.textContent = [
     `Object Class: ${article.objectClass || '--'}`,
     `最終更新: ${formatDateTime(article.updatedAt)}`,
-    `公開日時: ${article.publishedAt ? formatDateTime(article.publishedAt) : '未公開'}`,
-    article.summary ? `要約: ${article.summary}` : '要約なし',
+    `公開日: ${article.publishedAt ? formatDateTime(article.publishedAt) : '未公開'}`,
+    article.summary ? `概要: ${article.summary}` : '概要: 未入力',
   ].join(' / ');
   refs.publicUrl.value = article.publicUrl || '';
 
@@ -180,12 +172,24 @@ function renderSelectedArticle() {
   renderWarnings(state.warnings);
 }
 
-function renderAuthState() {
-  if (hasAdminPasscode()) {
-    refs.authHint.textContent = 'パスコード設定済みです。右のフォームからログインしてください。';
-  } else {
-    refs.authHint.textContent = 'まだパスコード未設定です。左のフォームから初期設定してください。';
+function renderAuthState({ configured = true, authenticated = false, username = '' } = {}) {
+  if (!configured) {
+    refs.authHint.textContent = 'Vercel の環境変数 `SANDBOX_ADMIN_PASSWORD` が未設定です。設定後に再読み込みしてください。';
+    return;
   }
+
+  refs.authHint.textContent = authenticated
+    ? `認証済み: ${username || 'admin'} / この画面はサーバーセッションで保護されています。`
+    : '認証が必要です。URLを知っていても、サーバー側の管理者認証を通過しない限り操作できません。';
+}
+
+async function fetchSessionStatus() {
+  const response = await fetch('/api/admin/session', {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  return response.json();
 }
 
 async function refreshData() {
@@ -258,7 +262,7 @@ async function runAuditAndPersist() {
 async function handleApprove() {
   const article = getSelectedArticle();
   if (!article) {
-    setStatus('承認対象の記事がありません。', 'warning');
+    setStatus('審査対象の記事がありません。', 'warning');
     return;
   }
 
@@ -268,7 +272,7 @@ async function handleApprove() {
   });
 
   if (report.status === 'blocked') {
-    const confirmed = window.confirm('停止レベルの指摘があります。このまま承認して公開URLを生成しますか。');
+    const confirmed = window.confirm('危険レベルの指摘があります。このまま公開URLを生成しますか。');
     if (!confirmed) {
       setStatus('承認をキャンセルしました。', 'info');
       return;
@@ -292,15 +296,15 @@ async function handleApprove() {
       publicationStatus: 'approved',
       moderationReport: report,
       publicToken: bundle.token,
-      publicUrl: bundle.url,
+      publicUrl: bundle.slugUrl || bundle.url,
       publishedAt: Date.now(),
       reviewedAt: report.checkedAt,
     });
 
     setStatus(
       warnings.length
-        ? '公開URLを生成して承認しました。警告も確認してください。'
-        : '公開URLを生成して承認しました。',
+        ? '短い公開URLを生成して承認しました。注意事項も確認してください。'
+        : '短い公開URLを生成して承認しました。',
       warnings.length ? 'warning' : 'success',
     );
   } catch (error) {
@@ -311,7 +315,7 @@ async function handleApprove() {
 async function handleReject() {
   const article = getSelectedArticle();
   if (!article) {
-    setStatus('差し戻し対象の記事がありません。', 'warning');
+    setStatus('対象の記事がありません。', 'warning');
     return;
   }
 
@@ -331,7 +335,7 @@ async function handleReject() {
     reviewedAt: report.checkedAt,
   });
 
-  setStatus('記事を差し戻し状態にしました。', 'warning');
+  setStatus('記事を差し戻しました。', 'warning');
 }
 
 async function handleDraft() {
@@ -351,7 +355,7 @@ async function handleDraft() {
     reviewedAt: 0,
   });
 
-  setStatus('記事を下書きへ戻しました。', 'info');
+  setStatus('記事を下書きに戻しました。', 'info');
 }
 
 async function handleCopyPublicUrl() {
@@ -376,76 +380,73 @@ function handleOpenPublic() {
 }
 
 function handleOpenEditor() {
-  window.open('/main', '_blank', 'noopener,noreferrer');
-}
-
-async function handleSetup() {
-  const passcode = refs.setupInput.value.trim();
-  const confirm = refs.setupConfirmInput.value.trim();
-
-  if (!passcode || passcode.length < 4) {
-    setStatus('パスコードは 4 文字以上にしてください。', 'warning');
-    return;
-  }
-
-  if (passcode !== confirm) {
-    setStatus('確認用パスコードが一致しません。', 'warning');
-    return;
-  }
-
-  await setAdminPasscode(passcode);
-  refs.setupInput.value = '';
-  refs.setupConfirmInput.value = '';
-  renderAuthState();
-  await refreshData();
-  showWorkspace();
-  setStatus('ローカル管理パスコードを設定しました。', 'success');
+  window.open(getStudioUrl(window.location.href), '_blank', 'noopener,noreferrer');
 }
 
 async function handleLogin() {
-  if (!hasAdminPasscode()) {
-    setStatus('先にパスコードを設定してください。', 'warning');
+  const username = refs.usernameInput.value.trim() || 'admin';
+  const password = refs.loginInput.value.trim();
+  if (!password) {
+    setStatus('パスワードを入力してください。', 'warning');
     return;
   }
 
-  const passcode = refs.loginInput.value.trim();
-  if (!passcode) {
-    setStatus('パスコードを入力してください。', 'warning');
-    return;
-  }
+  const response = await fetch('/api/admin/session', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      username,
+      password,
+    }),
+  });
 
-  const isValid = await verifyAdminPasscode(passcode);
-  if (!isValid) {
-    setStatus('パスコードが違います。', 'error');
+  const result = await response.json();
+  renderAuthState({
+    configured: result?.configured !== false,
+    authenticated: response.ok,
+    username,
+  });
+
+  if (!response.ok) {
+    setStatus(result?.message || '認証に失敗しました。', 'error');
     return;
   }
 
   refs.loginInput.value = '';
   await refreshData();
   showWorkspace();
-  setStatus('管理画面へログインしました。', 'success');
+  setStatus('管理コンソールにログインしました。', 'success');
 }
 
-function handleLogout() {
-  clearAdminSession();
+async function handleLogout() {
+  await fetch('/api/admin/session', {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  });
   showGate();
+  renderAuthState({
+    configured: true,
+    authenticated: false,
+  });
   setStatus('ログアウトしました。', 'info');
 }
 
 function setupActions() {
-  refs.setupButton.addEventListener('click', () => {
-    handleSetup().catch((error) => {
-      setStatus(error instanceof Error ? error.message : 'パスコード設定に失敗しました。', 'error');
-    });
-  });
-
   refs.loginButton.addEventListener('click', () => {
     handleLogin().catch((error) => {
       setStatus(error instanceof Error ? error.message : 'ログインに失敗しました。', 'error');
     });
   });
 
-  refs.logoutButton.addEventListener('click', handleLogout);
+  refs.logoutButton.addEventListener('click', () => {
+    handleLogout().catch((error) => {
+      setStatus(error instanceof Error ? error.message : 'ログアウトに失敗しました。', 'error');
+    });
+  });
+
   refs.articleList.addEventListener('click', (event) => {
     const button = event.target.closest('[data-article-id]');
     if (!button) {
@@ -454,6 +455,7 @@ function setupActions() {
 
     selectArticle(button.dataset.articleId);
   });
+
   refs.runAuditButton.addEventListener('click', () => {
     runAuditAndPersist()
       .then((report) => {
@@ -468,42 +470,53 @@ function setupActions() {
         setStatus(error instanceof Error ? error.message : '審査に失敗しました。', 'error');
       });
   });
+
   refs.approveButton.addEventListener('click', () => {
     handleApprove().catch((error) => {
       setStatus(error instanceof Error ? error.message : '承認に失敗しました。', 'error');
     });
   });
+
   refs.rejectButton.addEventListener('click', () => {
     handleReject().catch((error) => {
       setStatus(error instanceof Error ? error.message : '差し戻しに失敗しました。', 'error');
     });
   });
+
   refs.draftButton.addEventListener('click', () => {
     handleDraft().catch((error) => {
-      setStatus(error instanceof Error ? error.message : '下書き復帰に失敗しました。', 'error');
+      setStatus(error instanceof Error ? error.message : '下書き変更に失敗しました。', 'error');
     });
   });
+
   refs.copyPublicUrlButton.addEventListener('click', () => {
     handleCopyPublicUrl().catch((error) => {
-      setStatus(error instanceof Error ? error.message : 'URL コピーに失敗しました。', 'error');
+      setStatus(error instanceof Error ? error.message : 'URLコピーに失敗しました。', 'error');
     });
   });
+
   refs.openPublicButton.addEventListener('click', handleOpenPublic);
   refs.openEditorButton.addEventListener('click', handleOpenEditor);
 }
 
 async function init() {
   setupActions();
-  renderAuthState();
 
-  if (isAdminSessionActive()) {
-    try {
+  try {
+    const session = await fetchSessionStatus();
+    renderAuthState(session);
+
+    if (session?.authenticated) {
       await refreshData();
       showWorkspace();
-      setStatus('ローカル管理セッションを復元しました。', 'success');
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : '管理画面の初期化に失敗しました。', 'error');
+      setStatus('サーバー認証済みのため管理コンソールを開きました。', 'success');
+      return;
     }
+
+    showGate();
+  } catch (error) {
+    showGate();
+    setStatus(error instanceof Error ? error.message : '認証状態の確認に失敗しました。', 'error');
   }
 }
 
