@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Admin Console</title>
+    <meta
+      name="description"
+      content="SCP Sandbox Editor のローカル管理画面。公開審査、公開URL生成、差し戻し管理を行います。"
+    >
+    <link rel="stylesheet" href="/admin/styles.css">
+  </head>
+  <body>
+    <div class="admin-shell">
+      <header class="admin-masthead">
+        <div>
+          <p class="eyebrow">Admin / Review / Local Gate</p>
+          <h1>SCP Admin Console</h1>
+          <p id="adminStatus" class="admin-status is-info">
+            この管理画面のパスコードはクライアント側のローカル保護です。本格運用にはサーバー認証が必要です。
+          </p>
+        </div>
+
+        <nav class="admin-links">
+          <a href="/main">Editor</a>
+          <a href="/public">Public</a>
+          <a href="/share">Share</a>
+        </nav>
+      </header>
+
+      <section id="adminGateSection" class="admin-card gate-card">
+        <div class="gate-grid">
+          <section class="gate-panel">
+            <p class="eyebrow compact">First Setup</p>
+            <h2>パスコードを設定</h2>
+            <label class="field">
+              <span>新しいパスコード</span>
+              <input id="adminSetupInput" type="password" placeholder="6文字以上推奨">
+            </label>
+            <label class="field">
+              <span>確認用</span>
+              <input id="adminSetupConfirmInput" type="password" placeholder="再入力">
+            </label>
+            <button id="adminSetupButton" type="button">パスコードを保存</button>
+          </section>
+
+          <section class="gate-panel">
+            <p class="eyebrow compact">Login</p>
+            <h2>管理画面へ入る</h2>
+            <label class="field">
+              <span>パスコード</span>
+              <input id="adminLoginInput" type="password" placeholder="パスコードを入力">
+            </label>
+            <div class="button-grid">
+              <button id="adminLoginButton" type="button">ログイン</button>
+              <button id="adminLogoutButton" type="button" class="secondary-button">ログアウト</button>
+            </div>
+            <p id="adminAuthHint" class="muted-text">
+              まだパスコード未設定なら左のフォームから初期設定してください。
+            </p>
+          </section>
+        </div>
+      </section>
+
+      <section id="adminWorkspace" class="admin-workspace" hidden>
+        <section class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">Articles</span>
+            <strong id="adminTotalCount" class="stat-value">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Pending</span>
+            <strong id="adminPendingCount" class="stat-value">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Approved</span>
+            <strong id="adminApprovedCount" class="stat-value">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Blocked</span>
+            <strong id="adminBlockedCount" class="stat-value">0</strong>
+          </article>
+        </section>
+
+        <div class="admin-grid">
+          <aside class="admin-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Queue</p>
+                <h2>記事一覧</h2>
+              </div>
+            </div>
+            <div id="adminArticleList" class="queue-list"></div>
+          </aside>
+
+          <main class="admin-detail-stack">
+            <section class="admin-card detail-card">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow compact">Selected</p>
+                  <h2 id="adminSelectedTitle">記事を選んでください</h2>
+                </div>
+              </div>
+
+              <p id="adminSelectedMeta" class="muted-text">ここに記事の公開情報が表示されます。</p>
+              <p id="adminSelectedSummary" class="detail-summary">
+                ローカル審査の結果、公開URL、公開警告、カスタム CSS / JS の状態を確認できます。
+              </p>
+
+              <label class="field">
+                <span>公開URL</span>
+                <textarea id="adminPublicUrl" rows="4" readonly placeholder="承認するとここに公開URLが入ります。"></textarea>
+              </label>
+
+              <div class="button-grid">
+                <button id="adminRunAuditButton" type="button">ローカル審査を実行</button>
+                <button id="adminApproveButton" type="button">承認して公開</button>
+                <button id="adminRejectButton" type="button" class="secondary-button">差し戻し</button>
+                <button id="adminDraftButton" type="button" class="secondary-button">下書きへ戻す</button>
+                <button id="adminCopyPublicUrlButton" type="button" class="secondary-button">公開URLコピー</button>
+                <button id="adminOpenPublicButton" type="button" class="secondary-button">公開ページを開く</button>
+                <button id="adminOpenEditorButton" type="button" class="secondary-button">Editor を開く</button>
+              </div>
+            </section>
+
+            <section class="admin-card">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow compact">Audit Report</p>
+                  <h2>審査結果</h2>
+                </div>
+              </div>
+              <div id="adminIssueList" class="issue-list"></div>
+            </section>
+
+            <section class="admin-card">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow compact">Publish Warnings</p>
+                  <h2>公開時の注意</h2>
+                </div>
+              </div>
+              <div id="adminWarningList" class="issue-list"></div>
+            </section>
+          </main>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      window.addEventListener('error', (event) => {
+        const target = document.querySelector('#adminStatus');
+        if (!target || !event?.message) {
+          return;
+        }
+        target.textContent = `Admin Error: ${event.error?.stack || event.message}`;
+        target.className = 'admin-status is-error';
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const target = document.querySelector('#adminStatus');
+        if (!target) {
+          return;
+        }
+        const reason =
+          event?.reason?.stack || event?.reason?.message || String(event?.reason || 'Unknown error');
+        target.textContent = `Admin Error: ${reason}`;
+        target.className = 'admin-status is-error';
+      });
+    </script>
+    <script type="module" src="/admin/app.js"></script>
+  </body>
+</html>
