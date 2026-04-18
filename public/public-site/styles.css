@@ -1,0 +1,87 @@
+:root {
+  --bg: #efefef;
+  --paper: #ffffff;
+  --ink: #201717;
+  --muted: #5d5151;
+  --line: #cfc9c9;
+  --accent: #8d0f12;
+  --accent-soft: #cfe9c5;
+  --header-top: #090909;
+  --header-bottom: #7a4d4d;
+  --nav: #4b4b4b;
+  --shadow: 0 16px 42px rgba(0, 0, 0, 0.12);
+  --radius: 18px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  color: var(--ink);
+  background: linear-gradient(180deg, #f6f6f6 0%, #ececec 100%);
+  font-family: "Yu Gothic UI", "Hiragino Sans", "Segoe UI", sans-serif;
+}
+
+button,
+input,
+textarea,
+a {
+  font: inherit;
+}
+
+button,
+.file-button,
+.site-tools a,
+.site-nav a {
+  appearance: none;
+  border: 1px solid #7c6d6d;
+  border-radius: 10px;
+  padding: 0.72rem 0.96rem;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(180deg, #7e1818, #5d0e0e);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+button:hover,
+.file-button:hover,
+.site-tools a:hover,
+.site-nav a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+}
+
+.secondary-button {
+  background: linear-gradient(180deg, #6a6a6a, #4b4b4b);
+}
+
+input,
+textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #b4a9a9;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.9rem 1rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.site-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
