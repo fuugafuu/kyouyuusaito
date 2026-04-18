@@ -7,91 +7,141 @@
     <link rel="stylesheet" href="/main/styles.css">
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Sandbox / Archive / Internal Use Only</p>
+    <div class="shell-backdrop"></div>
+
+    <div class="site-shell">
+      <header class="app-chrome">
+        <div class="brand-block">
+          <p class="eyebrow">Containment / Draft / Local Sandbox</p>
           <h1>SCP Sandbox Editor</h1>
-          <p class="subhead">Wikidot風の構造を意識した、保存・復元・共有付きのローカル編集環境</p>
+          <p class="chrome-copy">ホーム、作成、プレビュー、設定を分けた多画面型のローカル編集ワークスペースです。</p>
         </div>
-        <div class="topbar-meta">
-          <span id="storageModeBadge" class="storage-badge">保存方式: 判定中</span>
+
+        <div class="chrome-actions">
+          <nav class="top-nav" aria-label="メインナビゲーション">
+            <button type="button" class="nav-chip is-active" data-view-nav="dashboard">Home</button>
+            <button type="button" class="nav-chip" data-view-nav="compose">Create</button>
+            <button type="button" class="nav-chip" data-view-nav="preview">Preview</button>
+            <button type="button" class="nav-chip" data-view-nav="settings">Settings</button>
+          </nav>
+          <div class="meta-badges">
+            <span id="storageModeBadge" class="storage-badge">保存方式: 判定中</span>
+            <span class="chrome-badge">No Backend MVP</span>
+          </div>
         </div>
       </header>
 
-      <div class="layout">
-        <aside class="sidebar">
-          <section class="panel">
-            <div class="section-heading">
-              <h2>プロフィール</h2>
-            </div>
-            <div class="profile-card">
+      <div class="app-grid">
+        <aside class="left-rail">
+          <section class="rail-card identity-card">
+            <div class="identity-stack">
               <img id="profileIconPreview" class="profile-icon" alt="プロフィールアイコン">
               <div>
-                <p id="liveProfileName" class="profile-name">財団職員</p>
+                <p class="identity-label">Current Profile</p>
+                <h2 id="liveProfileName" class="identity-name">財団職員</h2>
                 <p id="userKeyDisplay" class="muted-text">userKey: --</p>
               </div>
             </div>
-
-            <label class="field">
-              <span>表示名</span>
-              <input id="profileNameInput" type="text" maxlength="40" placeholder="ユーザー名">
-            </label>
-
-            <label class="field">
-              <span>アイコン画像</span>
-              <input
-                id="profileIconInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-              >
-            </label>
-
-            <div class="button-row">
-              <button id="saveProfileButton" type="button">プロフィール保存</button>
-              <button id="resetProfileIconButton" type="button" class="secondary-button">アイコン初期化</button>
+            <div class="identity-actions">
+              <button type="button" class="secondary-button" data-view-nav="settings">プロフィール設定</button>
+              <button type="button" data-view-nav="preview">共有準備へ</button>
             </div>
           </section>
 
-          <section class="panel">
-            <div class="section-heading">
-              <h2>設定とバックアップ</h2>
+          <section class="rail-card shortcut-card">
+            <div class="rail-heading">
+              <h2>Quick Actions</h2>
             </div>
-
-            <label class="toggle-row">
-              <input id="autoSaveToggle" type="checkbox">
-              <span>自動保存を有効にする</span>
-            </label>
-
-            <div class="button-row">
-              <button id="exportBackupButton" type="button">バックアップ出力</button>
-              <button id="importBackupButton" type="button" class="secondary-button">バックアップ復元</button>
+            <div class="shortcut-grid">
+              <button id="newArticleButton" type="button">新規記事</button>
+              <button type="button" class="secondary-button" data-view-nav="compose">作成画面へ</button>
+              <button type="button" class="secondary-button" data-view-nav="preview">閲覧確認</button>
+              <button type="button" class="secondary-button" data-view-nav="settings">設定画面</button>
             </div>
-
-            <label class="field">
-              <span>バックアップ文字列</span>
-              <textarea
-                id="backupText"
-                rows="7"
-                placeholder="ここにバックアップ文字列を出力・貼り付けします"
-              ></textarea>
-            </label>
           </section>
 
-          <section class="panel">
-            <div class="section-heading">
-              <h2>記事一覧</h2>
-              <button id="newArticleButton" type="button">新規作成</button>
+          <section class="rail-card archive-card">
+            <div class="rail-heading">
+              <div>
+                <p class="eyebrow compact">Local Archive</p>
+                <h2>記事一覧</h2>
+              </div>
             </div>
             <ul id="articleList" class="article-list"></ul>
           </section>
         </aside>
 
-        <main class="workspace">
-          <section class="panel">
-            <div class="section-heading">
+        <main class="main-stage">
+          <section class="view-panel is-active" data-view-panel="dashboard">
+            <section class="hero-panel">
+              <div class="hero-copy">
+                <p class="eyebrow">Sandbox Overview</p>
+                <h2 id="dashboardHeroTitle">SCP作成ワークスペース</h2>
+                <p id="dashboardHeroCopy" class="hero-text">
+                  記事の作成、添付、プレビュー、共有準備を画面ごとに分けて扱えます。
+                </p>
+              </div>
+              <div class="hero-actions">
+                <button type="button" data-view-nav="compose">作成を始める</button>
+                <button type="button" class="secondary-button" data-view-nav="preview">共有前チェック</button>
+              </div>
+            </section>
+
+            <section class="stats-grid">
+              <article class="stat-card">
+                <span class="stat-label">Articles</span>
+                <strong id="dashboardArticleCount" class="stat-value">0</strong>
+                <p class="stat-copy">保存済み記事数</p>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Attachments</span>
+                <strong id="dashboardAttachmentCount" class="stat-value">0</strong>
+                <p class="stat-copy">現在の総添付数</p>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Draft State</span>
+                <strong id="dashboardDraftState" class="stat-value">Clean</strong>
+                <p class="stat-copy">未保存状態の監視</p>
+              </article>
+              <article class="stat-card">
+                <span class="stat-label">Latest Save</span>
+                <strong id="dashboardLastSaved" class="stat-value">--</strong>
+                <p class="stat-copy">直近の更新</p>
+              </article>
+            </section>
+
+            <section class="dashboard-grid">
+              <article class="surface-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Recent</p>
+                    <h2>最近のドキュメント</h2>
+                  </div>
+                  <button type="button" class="secondary-button" data-view-nav="compose">エディタへ</button>
+                </div>
+                <div id="dashboardRecentList" class="dashboard-recent-list"></div>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Share Health</p>
+                    <h2>共有の状態</h2>
+                  </div>
+                  <button type="button" class="secondary-button" data-view-nav="preview">共有設定</button>
+                </div>
+                <div id="dashboardShareSummary" class="dashboard-share-summary">
+                  共有URLはまだ生成されていません。
+                </div>
+              </article>
+            </section>
+          </section>
+
+          <section class="view-panel" data-view-panel="compose">
+            <div class="view-header">
               <div>
-                <h2>記事エディタ</h2>
+                <p class="eyebrow">Create Screen</p>
+                <h2>作成画面</h2>
                 <p id="articleMeta" class="muted-text">記事が選択されていません。</p>
               </div>
               <div class="button-row">
@@ -100,85 +150,244 @@
               </div>
             </div>
 
-            <label class="field">
-              <span>記事タイトル</span>
-              <input id="articleTitleInput" type="text" placeholder="記事タイトル">
-            </label>
+            <div class="compose-grid">
+              <section class="surface-card compose-editor-card">
+                <label class="field">
+                  <span>記事タイトル</span>
+                  <input id="articleTitleInput" type="text" placeholder="記事タイトル">
+                </label>
 
-            <div class="toolbar">
-              <button type="button" data-command="bold">太字</button>
-              <button type="button" data-command="italic">斜体</button>
-              <button type="button" data-command="heading">見出し</button>
-              <button type="button" data-command="rule">水平線</button>
-              <button type="button" data-command="quote">引用</button>
-              <button type="button" data-command="link">リンク</button>
-              <button type="button" data-command="codeblock">Log</button>
-              <button type="button" data-command="image">画像挿入</button>
+                <div class="toolbar">
+                  <button type="button" data-command="bold">太字</button>
+                  <button type="button" data-command="italic">斜体</button>
+                  <button type="button" data-command="heading">見出し</button>
+                  <button type="button" data-command="rule">水平線</button>
+                  <button type="button" data-command="quote">引用</button>
+                  <button type="button" data-command="link">リンク</button>
+                  <button type="button" data-command="codeblock">Log</button>
+                  <button type="button" data-command="image">画像挿入</button>
+                </div>
+
+                <div class="tab-row" role="tablist" aria-label="編集モード">
+                  <button type="button" class="tab-button is-active" data-tab="edit" aria-selected="true">編集</button>
+                  <button type="button" class="tab-button" data-tab="preview" aria-selected="false">インラインプレビュー</button>
+                </div>
+
+                <textarea
+                  id="articleContentInput"
+                  class="editor-textarea"
+                  rows="18"
+                  placeholder="# 見出し&#10;&#10;本文を書く。&#10;監査ログ風テキストはそのまま貼り付けても整形されます。&#10;必要なら ``` で囲んでログブロックにできます。"
+                ></textarea>
+
+                <div id="articlePreview" class="rendered-article preview-surface" hidden></div>
+
+                <p class="muted-text">
+                  簡易記法: <code>#</code> / <code>##</code> / <code>###</code> 見出し、
+                  <code>**太字**</code>、<code>//斜体//</code>、<code>&gt; 引用</code>、
+                  <code>---</code>、<code>[[表示名|URL]]</code>、<code>[[attachment:ID|代替文]]</code>、
+                  <code>```</code> でログブロック。
+                </p>
+              </section>
+
+              <aside class="compose-sidebar">
+                <section class="surface-card">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow compact">Media Bay</p>
+                      <h2>添付画像</h2>
+                    </div>
+                    <label class="file-button">
+                      画像を追加
+                      <input
+                        id="attachmentInput"
+                        type="file"
+                        multiple
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                      >
+                    </label>
+                  </div>
+                  <p class="muted-text">共有時は使用画像のみを抽出し、必要に応じて軽量化します。</p>
+                  <div id="attachmentList" class="attachment-grid"></div>
+                </section>
+              </aside>
             </div>
-
-            <div class="tab-row" role="tablist" aria-label="編集モード">
-              <button type="button" class="tab-button is-active" data-tab="edit" aria-selected="true">編集</button>
-              <button type="button" class="tab-button" data-tab="preview" aria-selected="false">プレビュー</button>
-            </div>
-
-            <textarea
-              id="articleContentInput"
-              class="editor-textarea"
-              rows="18"
-              placeholder="# 見出し&#10;&#10;本文を書く。&#10;監査ログ風テキストはそのまま貼り付けても整形されます。&#10;必要なら ``` で囲んでログブロックにできます。"
-            ></textarea>
-
-            <div id="articlePreview" class="rendered-article preview-surface" hidden></div>
-
-            <p class="muted-text">
-              簡易記法: <code>#</code> / <code>##</code> / <code>###</code> 見出し、
-              <code>**太字**</code>、<code>//斜体//</code>、<code>&gt; 引用</code>、
-              <code>---</code>、<code>[[表示名|URL]]</code>、<code>[[attachment:ID|代替文]]</code>、
-              <code>```</code> でログブロック。監査ログ風テキストは貼り付けだけでも自動整形されます。
-            </p>
           </section>
 
-          <section class="panel">
-            <div class="section-heading">
+          <section class="view-panel" data-view-panel="preview">
+            <div class="view-header">
               <div>
-                <h2>添付画像</h2>
-                <p class="muted-text">SVGは安全のため受け付けません。大きい画像は圧縮保存します。</p>
+                <p class="eyebrow">Reader Screen</p>
+                <h2 id="previewArticleTitle">プレビュー対象の記事がありません。</h2>
+                <p id="previewArticleMeta" class="muted-text">共有前の表示確認と共有形式の選択を行います。</p>
               </div>
-              <label class="file-button">
-                画像を追加
-                <input
-                  id="attachmentInput"
-                  type="file"
-                  multiple
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                >
-              </label>
+              <div class="button-row">
+                <button type="button" class="secondary-button" data-view-nav="compose">作成画面へ戻る</button>
+              </div>
             </div>
 
-            <div id="attachmentList" class="attachment-grid"></div>
+            <div class="preview-grid">
+              <article class="surface-card preview-paper-card">
+                <div id="fullArticlePreview" class="rendered-article preview-paper"></div>
+              </article>
+
+              <aside class="preview-sidebar">
+                <section class="surface-card share-studio-card">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow compact">Share Studio</p>
+                      <h2>共有方法</h2>
+                    </div>
+                  </div>
+
+                  <div class="button-grid">
+                    <button id="generateShareButton" type="button">URLを生成</button>
+                    <button id="copyShareButton" type="button" class="secondary-button" disabled>URLをコピー</button>
+                    <button id="copySharePackageButton" type="button" class="secondary-button" disabled>受信用メッセージコピー</button>
+                    <button id="systemShareButton" type="button" class="secondary-button" disabled>端末で共有</button>
+                    <button id="downloadShareButton" type="button" class="secondary-button" disabled>共有ファイル保存</button>
+                    <button id="copyShareCodeButton" type="button" class="secondary-button" disabled>共有コードコピー</button>
+                    <button id="openShareButton" type="button" class="secondary-button" disabled>ビューで開く</button>
+                  </div>
+
+                  <label class="field">
+                    <span>共有URL</span>
+                    <textarea id="shareUrlOutput" rows="4" readonly placeholder="URL生成後にここへ表示されます"></textarea>
+                  </label>
+
+                  <label class="field">
+                    <span>共有コード</span>
+                    <textarea
+                      id="shareCodeOutput"
+                      rows="4"
+                      readonly
+                      placeholder="長いURLが不安な環境向けの圧縮共有コードです"
+                    ></textarea>
+                  </label>
+
+                  <p id="shareWarning" class="muted-text"></p>
+                  <p id="shareStatsOutput" class="muted-text">共有情報はまだ生成されていません。</p>
+                </section>
+
+                <section class="surface-card">
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow compact">Referenced Media</p>
+                      <h2>使用中の画像</h2>
+                    </div>
+                  </div>
+                  <div id="previewAttachmentList" class="preview-attachment-list"></div>
+                </section>
+              </aside>
+            </div>
           </section>
 
-          <section class="panel">
-            <div class="section-heading">
-              <h2>共有</h2>
-              <div class="button-row">
-                <button id="generateShareButton" type="button">共有リンク生成</button>
-                <button id="copyShareButton" type="button" class="secondary-button" disabled>共有URLをコピー</button>
+          <section class="view-panel" data-view-panel="settings">
+            <div class="view-header">
+              <div>
+                <p class="eyebrow">Control Room</p>
+                <h2>設定画面</h2>
+                <p class="muted-text">プロフィール、保存設定、バックアップ、共有時の運用確認をまとめています。</p>
               </div>
             </div>
 
-            <label class="field">
-              <span>共有URL</span>
-              <textarea id="shareUrlOutput" rows="4" readonly placeholder="共有リンクを生成するとここに表示されます"></textarea>
-            </label>
-            <p id="shareWarning" class="muted-text"></p>
+            <div class="settings-grid">
+              <section class="surface-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Profile</p>
+                    <h2>プロフィール設定</h2>
+                  </div>
+                </div>
+
+                <div class="settings-profile-preview">
+                  <img class="settings-profile-icon" src="" alt="" id="settingsProfileMirror">
+                  <div>
+                    <p class="muted-text">現在の表示名</p>
+                    <strong id="settingsProfileName">財団職員</strong>
+                  </div>
+                </div>
+
+                <label class="field">
+                  <span>表示名</span>
+                  <input id="profileNameInput" type="text" maxlength="40" placeholder="ユーザー名">
+                </label>
+
+                <label class="field">
+                  <span>アイコン画像</span>
+                  <input
+                    id="profileIconInput"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                  >
+                </label>
+
+                <div class="button-row">
+                  <button id="saveProfileButton" type="button">プロフィール保存</button>
+                  <button id="resetProfileIconButton" type="button" class="secondary-button">アイコン初期化</button>
+                </div>
+              </section>
+
+              <section class="surface-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Persistence</p>
+                    <h2>保存設定</h2>
+                  </div>
+                </div>
+
+                <label class="toggle-row">
+                  <input id="autoSaveToggle" type="checkbox">
+                  <span>自動保存を有効にする</span>
+                </label>
+
+                <div class="settings-note-list">
+                  <p>IndexedDB を主保存先として使用し、必要時のみ localStorage にフォールバックします。</p>
+                  <p>長い共有URLはメッセンジャーで不安定なため、共有コードや共有ファイルも併用できます。</p>
+                </div>
+              </section>
+
+              <section class="surface-card settings-backup-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Backup</p>
+                    <h2>バックアップ / 復元</h2>
+                  </div>
+                  <div class="button-row">
+                    <button id="exportBackupButton" type="button">バックアップ出力</button>
+                    <button id="importBackupButton" type="button" class="secondary-button">バックアップ復元</button>
+                  </div>
+                </div>
+
+                <label class="field">
+                  <span>バックアップ文字列</span>
+                  <textarea
+                    id="backupText"
+                    rows="10"
+                    placeholder="ここにバックアップ文字列を出力・貼り付けします"
+                  ></textarea>
+                </label>
+              </section>
+
+              <section class="surface-card">
+                <div class="section-heading">
+                  <div>
+                    <p class="eyebrow compact">Delivery Tips</p>
+                    <h2>共有の実運用メモ</h2>
+                  </div>
+                </div>
+                <ul class="tips-list">
+                  <li>短めの記事なら圧縮共有URLがそのまま使えます。</li>
+                  <li>長い記事や画像が多い場合は、共有ファイル保存や共有コードの併用が安全です。</li>
+                  <li>スマホで不安定なときは、端末の共有シートから送ると認識されやすくなります。</li>
+                </ul>
+              </section>
+            </div>
           </section>
         </main>
       </div>
 
-      <div id="statusMessage" class="status-message is-info" aria-live="polite">
-        初期化中...
-      </div>
+      <div id="statusMessage" class="status-message is-info" aria-live="polite">初期化中...</div>
     </div>
 
     <script>
@@ -196,6 +405,7 @@
         if (!target) {
           return;
         }
+
         const reason =
           event?.reason?.stack || event?.reason?.message || String(event?.reason || '不明なエラー');
         target.textContent = `初期化エラー: ${reason}`;

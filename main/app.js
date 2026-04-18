@@ -1,43 +1,86 @@
-import { AUTO_SAVE_INTERVAL_MS } from '../common/constants.js';
+import {
+  AUTO_SAVE_INTERVAL_MS,
+  SHARE_FILE_EXTENSION,
+  SHARE_URL_WARN_LENGTH,
+} from '../common/constants.js';
 import { createEmptyArticle } from '../common/models.js';
-import { copyText, ensureUserKey, serializeError } from '../common/utils.js';
+import { copyText, downloadTextFile, ensureUserKey, serializeError } from '../common/utils.js';
 import { createAttachmentsFromFiles, removeAttachmentFromArticle } from './attachments.js';
 import { exportBackupString, restoreBackupString } from './backup.js';
 import { createEditorController } from './editor.js';
 import { createProfileController } from './profile.js';
-import { buildShareData, buildShareUrl, getShareWarnings } from './share.js';
+import { buildShareBundle, buildSharePackageText, getShareWarnings } from './share.js';
 import { createMainState, getCurrentArticle, removeArticle, sortArticlesInState, upsertArticle } from './state.js';
 import { createStorageService } from './storage.js';
 import { createUI } from './ui.js';
 
 const state = createMainState();
+const VIEW_NAMES = new Set(['dashboard', 'compose', 'preview', 'settings']);
+
 let storage = null;
 let ui = null;
 let editor = null;
 let profileController = null;
 
+function getAttachmentCount() {
+  return state.articles.reduce((count, article) => count + (article.attachmentIds?.length || 0), 0);
+}
+
+function sanitizeFilenamePart(value) {
+  return String(value || 'scp-share')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, '-')
+    .slice(0, 60);
+}
+
+function setCurrentView(view, { syncHash = true } = {}) {
+  state.currentView = VIEW_NAMES.has(view) ? view : 'dashboard';
+  ui.setView(state.currentView);
+
+  if (syncHash) {
+    history.replaceState(null, '', `#${state.currentView}`);
+  }
+}
+
+function invalidateShareBundle() {
+  state.lastShareUrl = '';
+  state.lastShareBundle = null;
+}
+
+function renderWorkspace() {
+  const article = getCurrentArticle(state);
+
+  ui.setView(state.currentView);
+  ui.renderSettings(state.settings, state.storageMode);
+  ui.renderProfilePreview(state.profile);
+  ui.renderArticleList(state.articles, state.currentArticleId, state.dirty);
+  ui.renderCurrentArticle(article, state.dirty);
+  ui.renderAttachments(state.currentAttachments, state.selectedAttachmentId, article?.content || '');
+  ui.renderPreviewView(article, state.currentAttachments);
+  ui.renderDashboard({
+    articles: state.articles,
+    currentArticle: article,
+    attachmentCount: getAttachmentCount(),
+    dirty: state.dirty,
+    lastShareBundle: state.lastShareBundle,
+  });
+  ui.renderShare(state.lastShareBundle, state.lastShareBundle?.warnings || []);
+
+  editor.setContent(article?.content || '');
+  editor.setAttachments(state.currentAttachments);
+  editor.setTab(state.currentTab);
+}
+
 function markDirty() {
   state.dirty = true;
-  ui.renderArticleList(state.articles, state.currentArticleId, state.dirty);
-  ui.renderCurrentArticle(getCurrentArticle(state), state.dirty);
+  invalidateShareBundle();
+  renderWorkspace();
 }
 
 async function loadCurrentAttachments() {
   const article = getCurrentArticle(state);
   state.currentAttachments = article ? await storage.listAttachmentsByArticle(article.id) : [];
   state.selectedAttachmentId = state.currentAttachments[0]?.id || '';
-}
-
-function renderWorkspace() {
-  const article = getCurrentArticle(state);
-  ui.renderSettings(state.settings, state.storageMode);
-  ui.renderProfilePreview(state.profile);
-  ui.renderArticleList(state.articles, state.currentArticleId, state.dirty);
-  ui.renderCurrentArticle(article, state.dirty);
-  ui.renderAttachments(state.currentAttachments, state.selectedAttachmentId, article?.content || '');
-  editor.setContent(article?.content || '');
-  editor.setAttachments(state.currentAttachments);
-  editor.setTab(state.currentTab);
 }
 
 async function ensureInitialArticle() {
@@ -58,6 +101,7 @@ async function loadAllData() {
   await ensureInitialArticle();
   state.currentArticleId = state.currentArticleId || state.articles[0]?.id || '';
   state.dirty = false;
+  invalidateShareBundle();
   await loadCurrentAttachments();
   profileController.setProfile(state.profile, state.userKey);
   renderWorkspace();
@@ -121,6 +165,7 @@ async function handleSelectArticle(articleId) {
 
   state.currentArticleId = articleId;
   state.dirty = false;
+  invalidateShareBundle();
   await loadCurrentAttachments();
   renderWorkspace();
   ui.setStatus('記事を切り替えました。', 'info');
@@ -138,6 +183,8 @@ async function handleNewArticle() {
   state.currentAttachments = [];
   state.selectedAttachmentId = '';
   state.dirty = false;
+  invalidateShareBundle();
+  setCurrentView('compose');
   renderWorkspace();
   ui.setStatus('新規記事を作成しました。', 'success');
 }
@@ -158,6 +205,7 @@ async function handleDeleteArticle() {
   await ensureInitialArticle();
   state.currentArticleId = state.articles[0]?.id || '';
   state.dirty = false;
+  invalidateShareBundle();
   await loadCurrentAttachments();
   renderWorkspace();
   ui.setStatus('記事を削除しました。', 'success');
@@ -181,6 +229,7 @@ async function handleAttachmentFiles(files) {
       state.selectedAttachmentId = savedAttachment.id;
     }
 
+    invalidateShareBundle();
     await saveCurrentArticle({ silent: true });
     renderWorkspace();
 
@@ -217,7 +266,7 @@ function handleTitleInput(title) {
 
 function handleSelectAttachment(attachmentId) {
   state.selectedAttachmentId = attachmentId;
-  ui.renderAttachments(state.currentAttachments, state.selectedAttachmentId, getCurrentArticle(state)?.content || '');
+  renderWorkspace();
 }
 
 function insertSelectedAttachment() {
@@ -251,6 +300,7 @@ async function handleDeleteAttachment(attachmentId) {
   upsertArticle(state, nextArticle);
   state.currentArticleId = nextArticle.id;
   state.selectedAttachmentId = state.currentAttachments[0]?.id || '';
+  invalidateShareBundle();
   await saveCurrentArticle({ silent: true });
   renderWorkspace();
   ui.setStatus('添付画像を削除しました。', 'success');
@@ -259,7 +309,7 @@ async function handleDeleteAttachment(attachmentId) {
 async function handleSaveProfile(profile) {
   state.profile = await storage.saveProfile(profile);
   profileController.setProfile(state.profile, state.userKey);
-  ui.renderProfilePreview(state.profile);
+  renderWorkspace();
   ui.setStatus('プロフィールを保存しました。', 'success');
 }
 
@@ -268,7 +318,7 @@ async function handleToggleAutoSave(autoSave) {
     ...state.settings,
     autoSave,
   });
-  ui.renderSettings(state.settings, state.storageMode);
+  renderWorkspace();
   ui.setStatus(`自動保存を${autoSave ? '有効' : '無効'}にしました。`, 'info');
 }
 
@@ -294,37 +344,133 @@ async function handleImportBackup() {
   ui.setStatus('バックアップから復元しました。', 'success');
 }
 
-function handleGenerateShare() {
+async function handleGenerateShare() {
   const article = getCurrentArticle(state);
   if (!article) {
     ui.setStatus('共有対象の記事がありません。', 'warning');
     return;
   }
 
-  const shareData = buildShareData({
-    profile: state.profile,
-    article,
-    attachments: state.currentAttachments,
-  });
+  try {
+    ui.setStatus('共有データを最適化しています...', 'info');
+    const bundle = await buildShareBundle({
+      profile: state.profile,
+      article,
+      attachments: state.currentAttachments,
+      currentUrl: window.location.href,
+    });
+    const warnings = getShareWarnings(bundle);
+    state.lastShareUrl = bundle.url;
+    state.lastShareBundle = {
+      ...bundle,
+      warnings,
+    };
+    setCurrentView('preview');
+    renderWorkspace();
 
-  const url = buildShareUrl(shareData.payload, window.location.href);
-  const warnings = getShareWarnings(url, shareData.missingAttachmentIds);
-  state.lastShareUrl = url;
-  ui.renderShare(url, warnings);
-  ui.setStatus(
-    warnings.length > 0 ? '共有URLを生成しました。警告内容も確認してください。' : '共有URLを生成しました。',
-    warnings.length > 0 ? 'warning' : 'success',
-  );
+    ui.setStatus(
+      warnings.length > 0 ? '共有データを生成しました。警告内容も確認してください。' : '共有データを生成しました。',
+      warnings.length > 0 ? 'warning' : 'success',
+    );
+  } catch (error) {
+    ui.setStatus(`共有データの生成に失敗しました: ${serializeError(error)}`, 'error');
+  }
 }
 
 async function handleCopyShare() {
-  if (!state.lastShareUrl) {
-    ui.setStatus('先に共有URLを生成してください。', 'warning');
+  if (!state.lastShareBundle?.url) {
+    ui.setStatus('先に共有データを生成してください。', 'warning');
     return;
   }
 
-  await copyText(state.lastShareUrl);
+  await copyText(state.lastShareBundle.url);
   ui.setStatus('共有URLをコピーしました。', 'success');
+}
+
+async function handleCopyShareCode() {
+  if (!state.lastShareBundle?.token) {
+    ui.setStatus('共有コードがまだありません。', 'warning');
+    return;
+  }
+
+  await copyText(state.lastShareBundle.token);
+  ui.setStatus('共有コードをコピーしました。', 'success');
+}
+
+async function handleCopySharePackage() {
+  if (!state.lastShareBundle?.token) {
+    ui.setStatus('共有データを先に生成してください。', 'warning');
+    return;
+  }
+
+  await copyText(buildSharePackageText(state.lastShareBundle));
+  ui.setStatus('受信用メッセージをコピーしました。', 'success');
+}
+
+async function handleSystemShare() {
+  if (!state.lastShareBundle?.url) {
+    ui.setStatus('先に共有データを生成してください。', 'warning');
+    return;
+  }
+
+  if (typeof navigator.share !== 'function') {
+    ui.setStatus('この端末では共有シートが使えません。', 'warning');
+    return;
+  }
+
+  const article = getCurrentArticle(state);
+  const filename = `${sanitizeFilenamePart(article?.title || 'scp-share')}${SHARE_FILE_EXTENSION}`;
+  const shareFile =
+    typeof File === 'function'
+      ? new File([state.lastShareBundle.token], filename, {
+          type: 'text/plain;charset=utf-8',
+        })
+      : null;
+  const usePackageFallback = (state.lastShareBundle.metrics?.urlLength || 0) > SHARE_URL_WARN_LENGTH;
+  const shareText = usePackageFallback
+    ? buildSharePackageText(state.lastShareBundle)
+    : 'SCP Sandbox Editor から共有されたデータです。';
+
+  const shareData = {
+    title: article?.title || 'SCP Share',
+    text: shareText,
+    url: usePackageFallback ? state.lastShareBundle.baseViewerUrl : state.lastShareBundle.url,
+  };
+
+  if (shareFile && navigator.canShare?.({ files: [shareFile] })) {
+    shareData.files = [shareFile];
+  }
+
+  try {
+    await navigator.share(shareData);
+    ui.setStatus('端末の共有シートを開きました。', 'success');
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return;
+    }
+    ui.setStatus(`端末共有に失敗しました: ${serializeError(error)}`, 'error');
+  }
+}
+
+function handleDownloadShare() {
+  if (!state.lastShareBundle?.token) {
+    ui.setStatus('共有コードがまだありません。', 'warning');
+    return;
+  }
+
+  const article = getCurrentArticle(state);
+  const filename = `${sanitizeFilenamePart(article?.title || 'scp-share')}${SHARE_FILE_EXTENSION}`;
+  downloadTextFile(filename, state.lastShareBundle.token);
+  ui.setStatus('共有ファイルを保存しました。', 'success');
+}
+
+function handleOpenShare() {
+  if (!state.lastShareBundle?.url) {
+    ui.setStatus('共有URLがまだありません。', 'warning');
+    return;
+  }
+
+  window.open(state.lastShareBundle.url, '_blank', 'noopener,noreferrer');
 }
 
 function startAutoSaveLoop() {
@@ -352,6 +498,23 @@ function setupBeforeUnload() {
   });
 }
 
+function setupHashRouting() {
+  const initialHash = window.location.hash.replace(/^#/, '');
+  if (VIEW_NAMES.has(initialHash)) {
+    state.currentView = initialHash;
+  }
+
+  window.addEventListener('hashchange', () => {
+    const nextHash = window.location.hash.replace(/^#/, '');
+    if (!VIEW_NAMES.has(nextHash) || nextHash === state.currentView) {
+      return;
+    }
+
+    state.currentView = nextHash;
+    renderWorkspace();
+  });
+}
+
 async function init() {
   ui = createUI({
     onNewArticle: handleNewArticle,
@@ -371,6 +534,12 @@ async function init() {
     onImportBackup: handleImportBackup,
     onGenerateShare: handleGenerateShare,
     onCopyShare: handleCopyShare,
+    onCopySharePackage: handleCopySharePackage,
+    onCopyShareCode: handleCopyShareCode,
+    onSystemShare: handleSystemShare,
+    onDownloadShare: handleDownloadShare,
+    onOpenShare: handleOpenShare,
+    onViewChange: (view) => setCurrentView(view),
   });
 
   profileController = createProfileController({
@@ -398,6 +567,7 @@ async function init() {
   });
 
   try {
+    setupHashRouting();
     state.userKey = ensureUserKey();
     storage = await createStorageService(state.userKey);
     state.storageMode = storage.mode;
@@ -406,7 +576,7 @@ async function init() {
     setupBeforeUnload();
 
     if (state.storageMode === 'localstorage') {
-      ui.setStatus('IndexedDB が利用できなかったため localStorage フォールバックで動作しています。', 'warning');
+      ui.setStatus('IndexedDB が使えなかったため localStorage フォールバックで動作しています。', 'warning');
     } else {
       ui.setStatus('IndexedDB で初期化しました。', 'success');
     }

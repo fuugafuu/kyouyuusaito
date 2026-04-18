@@ -22,7 +22,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
 
 export const AUTO_SAVE_INTERVAL_MS = 15000;
 export const SHARE_HASH_KEY = 'data';
-export const SHARE_URL_WARN_LENGTH = 3500;
+export const SHARE_QUERY_KEY = 'd';
+export const SHARE_URL_WARN_LENGTH = 1800;
+export const SHARE_URL_DANGER_LENGTH = 6000;
+export const SHARE_IMAGE_MAX_DIMENSION = 960;
+export const SHARE_IMAGE_QUALITY = 0.72;
+export const SHARE_ICON_MAX_DIMENSION = 160;
+export const SHARE_ICON_QUALITY = 0.76;
+export const SHARE_FILE_EXTENSION = '.scp-share';
 
 export const MAX_ATTACHMENT_WARNING_BYTES = 2 * 1024 * 1024;
 export const MAX_ATTACHMENT_DIMENSION = 1600;

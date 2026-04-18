@@ -7,28 +7,114 @@
     <link rel="stylesheet" href="/share/styles.css">
   </head>
   <body>
-    <main class="viewer-shell">
-      <header class="viewer-header">
-        <p class="eyebrow">Shared View / Read Only</p>
-        <h1 id="viewerArticleTitle">共有データを読み込み中...</h1>
-        <p id="viewerStatus" class="viewer-status is-info">共有データを解析しています。</p>
+    <div class="viewer-backdrop"></div>
+
+    <div class="viewer-shell">
+      <header class="viewer-masthead">
+        <div>
+          <p class="eyebrow">Shared Viewer / Read Only</p>
+          <h1 id="viewerArticleTitle">共有ビューア</h1>
+          <p id="viewerStatus" class="viewer-status is-info">
+            共有URL、共有コード、受信用メッセージ、共有ファイルのいずれでも読み込めます。
+          </p>
+        </div>
+
+        <div class="viewer-header-actions">
+          <a class="viewer-link-button" href="/main">エディタへ戻る</a>
+          <button id="viewerResetButton" type="button" class="secondary-button">初期状態に戻す</button>
+        </div>
       </header>
 
-      <section class="viewer-profile">
-        <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有プロフィールアイコン">
-        <div>
-          <h2>投稿者</h2>
-          <p id="viewerProfileName">財団職員</p>
-        </div>
-      </section>
+      <section class="viewer-grid">
+        <aside class="viewer-sidebar">
+          <section class="viewer-card viewer-import-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Import</p>
+                <h2>共有データを読み込む</h2>
+              </div>
+            </div>
 
-      <article id="viewerArticleContent" class="viewer-article rendered-article"></article>
+            <label class="field">
+              <span>共有URL / 共有コード / 受信用メッセージ</span>
+              <textarea
+                id="viewerImportInput"
+                rows="8"
+                placeholder="ここに共有URLや共有コード、または受信用メッセージ全体を貼り付けます"
+              ></textarea>
+            </label>
 
-      <section class="viewer-gallery">
-        <h2>添付画像</h2>
-        <div id="viewerAttachmentList" class="viewer-attachment-grid"></div>
+            <div class="button-grid">
+              <button id="viewerLoadButton" type="button">この内容を開く</button>
+              <button id="viewerPasteButton" type="button" class="secondary-button">クリップボード貼り付け</button>
+              <label class="file-button">
+                共有ファイルを読む
+                <input id="viewerFileInput" type="file" accept=".scp-share,text/plain">
+              </label>
+              <button id="viewerClearButton" type="button" class="secondary-button">入力を消す</button>
+            </div>
+
+            <div class="viewer-tips">
+              <p>LINE やスマホでURLが長すぎる場合は、短い共有ビューURLと共有コードを一緒に送る運用が安全です。</p>
+              <p id="viewerEntryUrl" class="mono-note"></p>
+            </div>
+          </section>
+
+          <section class="viewer-card viewer-profile-card">
+            <div class="viewer-profile">
+              <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有プロフィールアイコン">
+              <div>
+                <p class="eyebrow compact">Profile</p>
+                <h2 id="viewerProfileName">財団職員</h2>
+                <p class="muted-text">共有ビューのため編集はできません。</p>
+              </div>
+            </div>
+
+            <div class="viewer-metrics">
+              <article class="metric-card">
+                <span class="metric-label">Mode</span>
+                <strong id="viewerDataMode">Waiting</strong>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label">Attachments</span>
+                <strong id="viewerAttachmentCount">0</strong>
+              </article>
+            </div>
+          </section>
+        </aside>
+
+        <main class="viewer-main">
+          <section class="viewer-card viewer-summary-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Recovered Payload</p>
+                <h2>共有内容</h2>
+              </div>
+              <span id="viewerSourceLabel" class="viewer-pill">No Data</span>
+            </div>
+            <p id="viewerSummary" class="muted-text">
+              共有データがまだ読み込まれていません。上の入力欄から共有URLや共有コードを読み込めます。
+            </p>
+          </section>
+
+          <article id="viewerArticleContent" class="viewer-paper rendered-article">
+            <p class="empty-preview">
+              読み込まれた共有記事はここに表示されます。危険なHTMLはサニタイズしてから描画します。
+            </p>
+          </article>
+
+          <section class="viewer-card viewer-gallery">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Attachment Gallery</p>
+                <h2>添付画像</h2>
+              </div>
+            </div>
+            <div id="viewerAttachmentList" class="viewer-attachment-grid"></div>
+          </section>
+        </main>
       </section>
-    </main>
+    </div>
 
     <script>
       window.addEventListener('error', (event) => {

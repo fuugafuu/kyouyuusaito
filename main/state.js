@@ -8,9 +8,11 @@ export function createMainState() {
     currentArticleId: '',
     currentAttachments: [],
     selectedAttachmentId: '',
+    currentView: 'dashboard',
     currentTab: 'edit',
     dirty: false,
     lastShareUrl: '',
+    lastShareBundle: null,
     isSaving: false,
   };
 }

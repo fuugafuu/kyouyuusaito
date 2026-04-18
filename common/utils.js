@@ -52,7 +52,7 @@ export function safeParseJSON(text, fallback = null) {
   }
 }
 
-function bytesToBase64(bytes) {
+export function bytesToBase64(bytes) {
   let binary = '';
   const chunkSize = 0x8000;
 
@@ -64,7 +64,7 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
-function base64ToBytes(base64) {
+export function base64ToBytes(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
 
@@ -83,6 +83,27 @@ export function encodeBase64Utf8(text) {
 export function decodeBase64Utf8(base64) {
   const decoder = new TextDecoder();
   return decoder.decode(base64ToBytes(base64));
+}
+
+export function encodeUtf8Bytes(text) {
+  return new TextEncoder().encode(String(text ?? ''));
+}
+
+export function decodeUtf8Bytes(bytes) {
+  return new TextDecoder().decode(bytes);
+}
+
+export function bytesToBase64Url(bytes) {
+  return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+export function base64UrlToBytes(base64Url) {
+  const normalized = String(base64Url || '')
+    .replaceAll('-', '+')
+    .replaceAll('_', '/')
+    .padEnd(Math.ceil(String(base64Url || '').length / 4) * 4, '=');
+
+  return base64ToBytes(normalized);
 }
 
 export function escapeHtml(value = '') {
@@ -124,6 +145,38 @@ export async function copyText(text) {
   textarea.select();
   document.execCommand('copy');
   document.body.removeChild(textarea);
+}
+
+export async function readClipboardText() {
+  if (!navigator.clipboard?.readText) {
+    throw new Error('クリップボード読み取りに対応していません。');
+  }
+
+  return navigator.clipboard.readText();
+}
+
+export function downloadTextFile(filename, text, mimeType = 'text/plain;charset=utf-8') {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+export function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました。'));
+    reader.readAsText(file, 'utf-8');
+  });
 }
 
 export function serializeError(error) {
@@ -176,6 +229,27 @@ export function estimateDataUrlBytes(dataUrl = '') {
   }
 
   return decodeURIComponent(payload).length;
+}
+
+export function splitDataUrl(dataUrl = '') {
+  const match = String(dataUrl || '').match(/^data:([^;,]+)(?:;charset=[^;,]+)?(;base64)?,(.*)$/i);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    mimeType: match[1].toLowerCase(),
+    isBase64: Boolean(match[2]),
+    payload: match[3] || '',
+  };
+}
+
+export function buildDataUrl(mimeType, payload, { isBase64 = true } = {}) {
+  if (!mimeType || !payload) {
+    return '';
+  }
+
+  return `data:${mimeType}${isBase64 ? ';base64' : ''},${payload}`;
 }
 
 export function fileToDataUrl(file) {
@@ -244,6 +318,51 @@ export async function resizeImageFileToDataUrl(
     mimeType,
     approxBytes: estimateDataUrlBytes(dataUrl),
     wasCompressed: dataUrl !== originalDataUrl,
+    width,
+    height,
+  };
+}
+
+export async function resizeImageDataUrl(
+  dataUrl,
+  { maxDimension = 1600, quality = 0.84, outputType = 'image/webp' } = {},
+) {
+  const source = String(dataUrl || '').trim();
+  const parts = splitDataUrl(source);
+  if (!parts) {
+    throw new Error('画像データの形式が不正です。');
+  }
+
+  if (parts.mimeType === 'image/gif') {
+    return {
+      dataUrl: source,
+      mimeType: parts.mimeType,
+      approxBytes: estimateDataUrlBytes(source),
+      wasCompressed: false,
+    };
+  }
+
+  const image = await loadImage(source);
+  const { width, height } = fitInside(image.width, image.height, maxDimension);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Canvas を初期化できませんでした。');
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  const mimeType = isSupportedImageType(outputType) ? outputType : 'image/webp';
+  const resizedDataUrl = canvas.toDataURL(mimeType, quality);
+
+  return {
+    dataUrl: resizedDataUrl,
+    mimeType,
+    approxBytes: estimateDataUrlBytes(resizedDataUrl),
+    wasCompressed: resizedDataUrl !== source,
     width,
     height,
   };
