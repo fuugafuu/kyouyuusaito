@@ -38,7 +38,7 @@
       "destination": "/share/index"
     },
     {
-      "source": "/p/:path*",
+      "source": "^/p/(.+)$",
       "destination": "/public-site/index"
     },
     {
