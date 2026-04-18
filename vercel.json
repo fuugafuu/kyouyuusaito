@@ -12,6 +12,14 @@
     {
       "source": "/share",
       "destination": "/share/index.html"
+    },
+    {
+      "source": "/public",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin/index.html"
     }
   ]
 }

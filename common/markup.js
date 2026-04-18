@@ -1,26 +1,22 @@
 import { escapeAttribute, escapeHtml, escapeRegExp } from './utils.js';
 
 function renderSafeLink(label, url) {
-  const trimmedUrl = String(url || '').trim();
-  if (!/^https?:\/\//i.test(trimmedUrl)) {
+  const safeUrl = String(url || '').trim();
+  if (!/^https?:\/\//i.test(safeUrl)) {
     return escapeHtml(label);
   }
 
-  return `<a href="${escapeAttribute(
-    trimmedUrl,
-  )}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+  return `<a href="${escapeAttribute(safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
 }
 
 function renderAttachment(id, alt, attachmentMap) {
   const attachment = attachmentMap.get(id);
   if (!attachment) {
-    return `<span class="missing-attachment">添付画像が見つかりません: ${escapeHtml(id)}</span>`;
+    return `<span class="missing-attachment">missing attachment: ${escapeHtml(id)}</span>`;
   }
 
-  const altText = alt || attachment.name || '添付画像';
-  return `<img class="inline-attachment" src="${escapeAttribute(
-    attachment.data,
-  )}" alt="${escapeAttribute(altText)}" data-attachment-id="${escapeAttribute(id)}">`;
+  const altText = alt || attachment.name || 'attachment';
+  return `<img class="inline-attachment" src="${escapeAttribute(attachment.data)}" alt="${escapeAttribute(altText)}" data-attachment-id="${escapeAttribute(id)}">`;
 }
 
 function renderInlineMarkup(text, attachmentMap) {
@@ -92,56 +88,42 @@ function parseFoldDirective(line) {
 }
 
 function getLogLineScore(line) {
-  const trimmed = line.trim();
+  const trimmed = String(line || '').trim();
   if (!trimmed) {
     return 0;
   }
 
   let score = 0;
-
   if (/^\[[A-Z0-9_-]+(?:\s+[A-Z0-9_-]+)*\]/.test(trimmed)) {
     score += 2;
   }
-
   if (/^[A-Z][A-Z0-9_.-]*\s*=/.test(trimmed)) {
     score += 2;
   }
-
-  if (/^[A-Z][A-Z0-9_.-]*(?:\s+[A-Z0-9_.-]+){1,}$/.test(trimmed)) {
+  if (/"[^"]+"/.test(trimmed)) {
     score += 1;
   }
-
-  if (/".*"/.test(trimmed)) {
+  if (/(NOT FOUND|UNRESOLVED|MISMATCH|PURGED|EMPTY|DEGRADATION|RISK)/i.test(trimmed)) {
     score += 1;
   }
-
-  if (/(?:NOT FOUND|UNRESOLVED|DEGRADATION|MISMATCH|PURGED|EMPTY|RISK)/.test(trimmed.toUpperCase())) {
-    score += 1;
-  }
-
   return score;
 }
 
 function isLikelyLogBlock(lines) {
-  const visibleLines = lines.filter((line) => line.trim());
+  const visibleLines = lines.filter((line) => String(line || '').trim());
   if (visibleLines.length < 3) {
     return false;
   }
 
   const totalScore = visibleLines.reduce((sum, line) => sum + getLogLineScore(line), 0);
-  const hasAuditHeader = visibleLines.some((line) =>
-    /^\[[A-Z0-9_-]+(?:\s+[A-Z0-9_-]+)*\]/.test(line.trim()),
-  );
-  const hasKeyValueLine = visibleLines.some((line) => /^[A-Z][A-Z0-9_.-]*\s*=/.test(line.trim()));
-
-  return totalScore >= visibleLines.length * 1.5 && (hasAuditHeader || hasKeyValueLine);
+  return totalScore >= visibleLines.length * 1.5;
 }
 
 export function extractAttachmentReferences(content = '') {
   const ids = new Set();
   const pattern = /\[\[attachment:([a-z0-9_-]+)(?:\|[^\]]*)?\]\]/gi;
 
-  for (const match of content.matchAll(pattern)) {
+  for (const match of String(content || '').matchAll(pattern)) {
     if (match[1]) {
       ids.add(match[1]);
     }
@@ -156,13 +138,13 @@ export function removeAttachmentReferences(content = '', attachmentId) {
     'gi',
   );
 
-  return content.replace(pattern, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  return String(content || '').replace(pattern, '').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
 export function parseMarkupToHtml(content = '', attachments = []) {
-  const normalizedContent = String(content).replaceAll('\r\n', '\n');
+  const normalizedContent = String(content || '').replaceAll('\r\n', '\n');
   if (!normalizedContent.trim()) {
-    return '<p class="empty-preview">本文はまだありません。</p>';
+    return '<p class="empty-preview">本文はまだ空です。</p>';
   }
 
   const attachmentMap = new Map(
@@ -194,16 +176,16 @@ export function parseMarkupToHtml(content = '', attachments = []) {
   };
 
   const flushQuote = () => {
-    if (quote.length) {
-      blocks.push(renderQuote(quote.splice(0), attachmentMap));
+    if (!quote.length) {
+      return;
     }
+    blocks.push(renderQuote(quote.splice(0), attachmentMap));
   };
 
   const flushCodeBlock = () => {
     if (!codeBlock.length) {
       return;
     }
-
     blocks.push(renderPreformatted(codeBlock.splice(0), 'code-block'));
   };
 

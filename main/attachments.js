@@ -4,13 +4,13 @@ import {
   MAX_PROFILE_ICON_DIMENSION,
   MAX_PROFILE_ICON_WARNING_BYTES,
 } from '../common/constants.js';
+import { removeAttachmentReferences } from '../common/markup.js';
 import { normalizeAttachment } from '../common/models.js';
 import { generateId, isSupportedImageType, resizeImageFileToDataUrl } from '../common/utils.js';
-import { removeAttachmentReferences } from '../common/markup.js';
 
 async function prepareImage(file, options) {
   if (!isSupportedImageType(file.type)) {
-    throw new Error(`${file.name} は PNG / JPEG / WebP / GIF のみ対応です。`);
+    throw new Error(`${file.name} は PNG / JPEG / WebP / GIF のみ対応しています。`);
   }
 
   if (file.type === 'image/gif') {
@@ -59,7 +59,7 @@ export async function createProfileIconFromFile(file) {
 
   const warnings = [];
   if (file.size > MAX_PROFILE_ICON_WARNING_BYTES || processed.approxBytes > MAX_PROFILE_ICON_WARNING_BYTES) {
-    warnings.push('アイコン画像が大きめです。共有URLに含める場合は長くなる可能性があります。');
+    warnings.push('アイコン画像が大きめです。共有データやバックアップが重くなる場合があります。');
   }
 
   return {

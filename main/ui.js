@@ -1,8 +1,16 @@
 import { DEFAULT_PROFILE_ICON, DEFAULT_PROFILE_NAME, EMPTY_ARTICLE_TITLE } from '../common/constants.js';
-import { parseMarkupToHtml } from '../common/markup.js';
+import { extractAttachmentReferences, parseMarkupToHtml } from '../common/markup.js';
+import { buildArticleDesignation, buildArticleSlug } from '../common/publication.js';
+import { mountSandboxedArticleFrame } from '../common/render-frame.js';
 import { setSanitizedHTML } from '../common/sanitize.js';
-import { extractAttachmentReferences } from '../common/markup.js';
 import { formatDateTime } from '../common/utils.js';
+
+const PUBLICATION_LABELS = {
+  draft: '下書き',
+  pending: '審査待ち',
+  approved: '公開中',
+  rejected: '差し戻し',
+};
 
 function renderEmptyState(container, text) {
   container.innerHTML = '';
@@ -10,6 +18,13 @@ function renderEmptyState(container, text) {
   empty.className = 'empty-state';
   empty.textContent = text;
   container.appendChild(empty);
+}
+
+function createStatusPill(status) {
+  const pill = document.createElement('span');
+  pill.className = 'viewer-pill';
+  pill.textContent = PUBLICATION_LABELS[status] || '下書き';
+  return pill;
 }
 
 function createRecentArticleCard(article, isCurrent) {
@@ -27,11 +42,11 @@ function createRecentArticleCard(article, isCurrent) {
 
   const meta = document.createElement('span');
   meta.className = 'muted-text';
-  meta.textContent = `更新: ${formatDateTime(article.updatedAt)}`;
+  meta.textContent = `${buildArticleDesignation(article)} / 更新: ${formatDateTime(article.updatedAt)}`;
 
   const status = document.createElement('span');
   status.className = 'muted-text';
-  status.textContent = isCurrent ? '現在編集中の記事' : 'クリックで編集画面へ';
+  status.textContent = isCurrent ? '現在編集中' : `状態: ${PUBLICATION_LABELS[article.publicationStatus] || '下書き'}`;
 
   button.append(title, meta, status);
   wrapper.appendChild(button);
@@ -58,6 +73,29 @@ function createPreviewAttachmentCard(attachment) {
   return card;
 }
 
+function getPublicationSummary(article) {
+  if (!article) {
+    return '記事を選ぶと公開状態がここに表示されます。';
+  }
+
+  const designation = buildArticleDesignation(article);
+  const slug = buildArticleSlug(article);
+
+  if (article.publicationStatus === 'approved' && article.publicUrl) {
+    return `${designation} / slug: ${slug} / 公開日時: ${formatDateTime(article.publishedAt)}`;
+  }
+
+  if (article.publicationStatus === 'pending') {
+    return `${designation} は審査待ちです。Admin 画面で承認すると公開URLが確定します。`;
+  }
+
+  if (article.publicationStatus === 'rejected') {
+    return `${designation} は差し戻し状態です。修正後に再度審査へ送ってください。`;
+  }
+
+  return `${designation} / slug: ${slug} / 公開前の下書きです。`;
+}
+
 export function createUI(handlers) {
   const refs = {
     statusMessage: document.querySelector('#statusMessage'),
@@ -78,6 +116,18 @@ export function createUI(handlers) {
     newArticleButton: document.querySelector('#newArticleButton'),
     articleList: document.querySelector('#articleList'),
     articleTitleInput: document.querySelector('#articleTitleInput'),
+    articleSeriesInput: document.querySelector('#articleSeriesInput'),
+    articleNumberInput: document.querySelector('#articleNumberInput'),
+    articleObjectClassInput: document.querySelector('#articleObjectClassInput'),
+    articleSlugInput: document.querySelector('#articleSlugInput'),
+    articleSummaryInput: document.querySelector('#articleSummaryInput'),
+    articleCustomCssInput: document.querySelector('#articleCustomCssInput'),
+    articleCustomJsInput: document.querySelector('#articleCustomJsInput'),
+    publicationNote: document.querySelector('#publicationNote'),
+    requestReviewButton: document.querySelector('#requestReviewButton'),
+    requestReviewButtonAlt: document.querySelector('#requestReviewButtonAlt'),
+    openAdminButton: document.querySelector('#openAdminButton'),
+    openAdminButtonAlt: document.querySelector('#openAdminButtonAlt'),
     saveArticleButton: document.querySelector('#saveArticleButton'),
     deleteArticleButton: document.querySelector('#deleteArticleButton'),
     attachmentInput: document.querySelector('#attachmentInput'),
@@ -93,8 +143,11 @@ export function createUI(handlers) {
     dashboardAttachmentCount: document.querySelector('#dashboardAttachmentCount'),
     dashboardDraftState: document.querySelector('#dashboardDraftState'),
     dashboardLastSaved: document.querySelector('#dashboardLastSaved'),
+    dashboardPendingCount: document.querySelector('#dashboardPendingCount'),
+    dashboardApprovedCount: document.querySelector('#dashboardApprovedCount'),
     dashboardRecentList: document.querySelector('#dashboardRecentList'),
     dashboardShareSummary: document.querySelector('#dashboardShareSummary'),
+    dashboardPublicSummary: document.querySelector('#dashboardPublicSummary'),
     generateShareButton: document.querySelector('#generateShareButton'),
     copyShareButton: document.querySelector('#copyShareButton'),
     copySharePackageButton: document.querySelector('#copySharePackageButton'),
@@ -110,6 +163,13 @@ export function createUI(handlers) {
     previewArticleTitle: document.querySelector('#previewArticleTitle'),
     previewArticleMeta: document.querySelector('#previewArticleMeta'),
     fullArticlePreview: document.querySelector('#fullArticlePreview'),
+    publicPreviewFrame: document.querySelector('#publicPreviewFrame'),
+    publicationStatusBadge: document.querySelector('#publicationStatusBadge'),
+    publicationSummary: document.querySelector('#publicationSummary'),
+    publicationIssueList: document.querySelector('#publicationIssueList'),
+    publicUrlOutput: document.querySelector('#publicUrlOutput'),
+    copyPublicUrlButton: document.querySelector('#copyPublicUrlButton'),
+    openPublicButton: document.querySelector('#openPublicButton'),
     previewAttachmentList: document.querySelector('#previewAttachmentList'),
     viewPanels: [...document.querySelectorAll('[data-view-panel]')],
   };
@@ -123,9 +183,7 @@ export function createUI(handlers) {
   refs.newArticleButton.addEventListener('click', () => handlers.onNewArticle?.());
   refs.saveArticleButton.addEventListener('click', () => handlers.onSaveArticle?.());
   refs.deleteArticleButton.addEventListener('click', () => handlers.onDeleteArticle?.());
-  refs.autoSaveToggle.addEventListener('change', (event) =>
-    handlers.onToggleAutoSave?.(event.target.checked),
-  );
+  refs.autoSaveToggle.addEventListener('change', (event) => handlers.onToggleAutoSave?.(event.target.checked));
   refs.exportBackupButton.addEventListener('click', () => handlers.onExportBackup?.());
   refs.importBackupButton.addEventListener('click', () => handlers.onImportBackup?.());
   refs.generateShareButton.addEventListener('click', () => handlers.onGenerateShare?.());
@@ -135,9 +193,21 @@ export function createUI(handlers) {
   refs.downloadShareButton.addEventListener('click', () => handlers.onDownloadShare?.());
   refs.copyShareCodeButton.addEventListener('click', () => handlers.onCopyShareCode?.());
   refs.openShareButton.addEventListener('click', () => handlers.onOpenShare?.());
-  refs.articleTitleInput.addEventListener('input', (event) =>
-    handlers.onTitleInput?.(event.target.value),
-  );
+  refs.copyPublicUrlButton.addEventListener('click', () => handlers.onCopyPublicUrl?.());
+  refs.openPublicButton.addEventListener('click', () => handlers.onOpenPublic?.());
+  refs.requestReviewButton.addEventListener('click', () => handlers.onRequestReview?.());
+  refs.requestReviewButtonAlt.addEventListener('click', () => handlers.onRequestReview?.());
+  refs.openAdminButton.addEventListener('click', () => handlers.onOpenAdmin?.());
+  refs.openAdminButtonAlt.addEventListener('click', () => handlers.onOpenAdmin?.());
+
+  refs.articleTitleInput.addEventListener('input', (event) => handlers.onTitleInput?.(event.target.value));
+  refs.articleSeriesInput.addEventListener('change', (event) => handlers.onMetaChange?.('series', event.target.value));
+  refs.articleNumberInput.addEventListener('input', (event) => handlers.onMetaChange?.('articleNumber', event.target.value));
+  refs.articleObjectClassInput.addEventListener('input', (event) => handlers.onMetaChange?.('objectClass', event.target.value));
+  refs.articleSlugInput.addEventListener('input', (event) => handlers.onMetaChange?.('slug', event.target.value));
+  refs.articleSummaryInput.addEventListener('input', (event) => handlers.onMetaChange?.('summary', event.target.value));
+  refs.articleCustomCssInput.addEventListener('input', (event) => handlers.onMetaChange?.('customCss', event.target.value));
+  refs.articleCustomJsInput.addEventListener('input', (event) => handlers.onMetaChange?.('customJs', event.target.value));
 
   refs.navButtons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -158,7 +228,6 @@ export function createUI(handlers) {
     }
 
     await handlers.onSelectArticle?.(button.dataset.articleId || '');
-
     if (button.dataset.viewNext) {
       handlers.onViewChange?.(button.dataset.viewNext);
     }
@@ -199,7 +268,6 @@ export function createUI(handlers) {
 
     setView(view) {
       const nextView = view || 'dashboard';
-
       refs.viewPanels.forEach((panel) => {
         panel.classList.toggle('is-active', panel.dataset.viewPanel === nextView);
       });
@@ -211,7 +279,7 @@ export function createUI(handlers) {
 
     renderStorageMode(mode) {
       refs.storageModeBadge.textContent =
-        mode === 'localstorage' ? '保存方式: localStorage フォールバック' : '保存方式: IndexedDB';
+        mode === 'localstorage' ? '保存先: localStorage fallback' : '保存先: IndexedDB';
       refs.storageModeBadge.className = `storage-badge mode-${mode}`;
     },
 
@@ -221,36 +289,44 @@ export function createUI(handlers) {
     },
 
     renderDashboard({ articles, currentArticle, attachmentCount, dirty, lastShareBundle }) {
+      const pendingCount = articles.filter((article) => article.publicationStatus === 'pending').length;
+      const approvedCount = articles.filter((article) => article.publicationStatus === 'approved').length;
+
       refs.dashboardHeroTitle.textContent = currentArticle
         ? `${currentArticle.title} を編集中`
-        : 'SCP作成ワークスペース';
+        : 'SCP Sandbox Workspace';
       refs.dashboardHeroCopy.textContent = currentArticle
-        ? '現在の記事を起点に、作成画面とプレビュー画面を切り替えながら整えていけます。'
-        : '記事の新規作成、閲覧確認、共有準備を段階的に進められます。';
+        ? '現在の記事を編集しながら、共有や公開準備までまとめて進められます。'
+        : '記事の新規作成、共有URL生成、公開審査の準備をひとつの場所で扱えます。';
       refs.dashboardArticleCount.textContent = String(articles.length);
       refs.dashboardAttachmentCount.textContent = String(attachmentCount);
       refs.dashboardDraftState.textContent = dirty ? 'Unsaved' : 'Clean';
       refs.dashboardLastSaved.textContent = currentArticle ? formatDateTime(currentArticle.updatedAt) : '--';
+      refs.dashboardPendingCount.textContent = String(pendingCount);
+      refs.dashboardApprovedCount.textContent = String(approvedCount);
 
       if (!articles.length) {
         renderEmptyState(refs.dashboardRecentList, 'まだ記事がありません。');
       } else {
         refs.dashboardRecentList.innerHTML = '';
         articles.slice(0, 5).forEach((article) => {
-          refs.dashboardRecentList.appendChild(
-            createRecentArticleCard(article, article.id === currentArticle?.id),
-          );
+          refs.dashboardRecentList.appendChild(createRecentArticleCard(article, article.id === currentArticle?.id));
         });
       }
 
       if (!lastShareBundle?.url) {
-        refs.dashboardShareSummary.textContent =
-          '共有URLはまだ生成されていません。Preview 画面で共有形式を作成できます。';
-        return;
+        refs.dashboardShareSummary.textContent = 'まだ共有URLは生成されていません。Preview 画面から生成できます。';
+      } else {
+        const warnings = lastShareBundle.warnings?.length ? `警告 ${lastShareBundle.warnings.length} 件` : '警告なし';
+        refs.dashboardShareSummary.textContent = `最新共有URL長: ${lastShareBundle.metrics.urlLength} 文字 / 画像 ${lastShareBundle.metrics.usedAttachmentCount} 枚 / ${warnings}`;
       }
 
-      const warnings = lastShareBundle.warnings?.length ? `警告 ${lastShareBundle.warnings.length}件` : '警告なし';
-      refs.dashboardShareSummary.textContent = `直近の共有URL長: ${lastShareBundle.metrics.urlLength} 文字 / 画像 ${lastShareBundle.metrics.usedAttachmentCount} 点 / ${warnings}`;
+      const latestApproved = articles.find((article) => article.publicationStatus === 'approved' && article.publicUrl);
+      if (!latestApproved) {
+        refs.dashboardPublicSummary.textContent = 'まだ公開承認された記事はありません。Admin 画面で審査できます。';
+      } else {
+        refs.dashboardPublicSummary.textContent = `最新公開: ${buildArticleDesignation(latestApproved)} / ${latestApproved.title} / ${latestApproved.publicUrl}`;
+      }
     },
 
     renderArticleList(articles, currentArticleId, dirty) {
@@ -259,14 +335,13 @@ export function createUI(handlers) {
       if (!articles.length) {
         const empty = document.createElement('li');
         empty.className = 'empty-state';
-        empty.textContent = '記事はまだありません。';
+        empty.textContent = '記事がまだありません。';
         refs.articleList.appendChild(empty);
         return;
       }
 
       for (const article of articles) {
         const item = document.createElement('li');
-
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.articleId = article.id;
@@ -279,9 +354,9 @@ export function createUI(handlers) {
 
         const meta = document.createElement('span');
         meta.className = 'article-link-meta';
-        meta.textContent = formatDateTime(article.updatedAt);
+        meta.textContent = `${buildArticleDesignation(article)} / ${formatDateTime(article.updatedAt)}`;
 
-        button.append(title, meta);
+        button.append(title, meta, createStatusPill(article.publicationStatus));
 
         if (dirty && article.id === currentArticleId) {
           const draft = document.createElement('span');
@@ -299,13 +374,30 @@ export function createUI(handlers) {
       const hasArticle = Boolean(article);
       refs.articleTitleInput.disabled = !hasArticle;
       refs.articleContentInput.disabled = !hasArticle;
+      refs.articleSeriesInput.disabled = !hasArticle;
+      refs.articleNumberInput.disabled = !hasArticle;
+      refs.articleObjectClassInput.disabled = !hasArticle;
+      refs.articleSlugInput.disabled = !hasArticle;
+      refs.articleSummaryInput.disabled = !hasArticle;
+      refs.articleCustomCssInput.disabled = !hasArticle;
+      refs.articleCustomJsInput.disabled = !hasArticle;
       refs.saveArticleButton.disabled = !hasArticle;
       refs.deleteArticleButton.disabled = !hasArticle;
       refs.generateShareButton.disabled = !hasArticle;
+      refs.requestReviewButton.disabled = !hasArticle;
+      refs.requestReviewButtonAlt.disabled = !hasArticle;
 
       refs.articleTitleInput.value = article?.title || '';
+      refs.articleSeriesInput.value = article?.series || 'SCP';
+      refs.articleNumberInput.value = article?.articleNumber ? String(article.articleNumber) : '';
+      refs.articleObjectClassInput.value = article?.objectClass || '';
+      refs.articleSlugInput.value = article?.slug || '';
+      refs.articleSummaryInput.value = article?.summary || '';
+      refs.articleCustomCssInput.value = article?.customCss || '';
+      refs.articleCustomJsInput.value = article?.customJs || '';
+
       refs.articleMeta.textContent = hasArticle
-        ? `${dirty ? '未保存 / ' : ''}最終更新: ${formatDateTime(article.updatedAt)}`
+        ? `${dirty ? '未保存 / ' : ''}${buildArticleDesignation(article)} / 最終更新: ${formatDateTime(article.updatedAt)}`
         : '記事が選択されていません。';
     },
 
@@ -337,7 +429,7 @@ export function createUI(handlers) {
 
         const badge = document.createElement('p');
         badge.className = 'attachment-usage';
-        badge.textContent = referencedIds.has(attachment.id) ? '本文で使用中' : '未挿入';
+        badge.textContent = referencedIds.has(attachment.id) ? '本文で使用中' : '未参照';
 
         const buttonRow = document.createElement('div');
         buttonRow.className = 'attachment-actions';
@@ -350,7 +442,7 @@ export function createUI(handlers) {
 
         const insertButton = document.createElement('button');
         insertButton.type = 'button';
-        insertButton.textContent = '本文へ挿入';
+        insertButton.textContent = '本文へ';
         insertButton.dataset.attachmentId = attachment.id;
         insertButton.dataset.action = 'insert';
 
@@ -367,32 +459,49 @@ export function createUI(handlers) {
       }
     },
 
-    renderPreviewView(article, attachments) {
+    renderPreviewView(article, attachments, profile) {
       refs.previewArticleTitle.textContent = article?.title || 'プレビュー対象の記事がありません。';
       const referencedIds = new Set(extractAttachmentReferences(article?.content || ''));
       const usedAttachments = attachments.filter((attachment) => referencedIds.has(attachment.id));
 
       refs.previewArticleMeta.textContent = article
-        ? `最終更新: ${formatDateTime(article.updatedAt)} / 使用画像 ${usedAttachments.length} 点`
-        : '共有前の表示確認と共有形式の選択を行います。';
+        ? `${buildArticleDesignation(article)} / 最終更新: ${formatDateTime(article.updatedAt)} / 使用画像 ${usedAttachments.length} 枚`
+        : '記事を選ぶとここに公開前プレビューと配布導線が表示されます。';
 
       if (!article) {
         refs.fullArticlePreview.innerHTML = '<p class="empty-preview">記事がありません。</p>';
-        renderEmptyState(refs.previewAttachmentList, '使用中の画像はありません。');
+        renderEmptyState(refs.previewAttachmentList, '使用中の添付はありません。');
+        mountSandboxedArticleFrame(refs.publicPreviewFrame, {
+          title: 'Preview',
+          articleHtml: '<p class="empty-preview">記事がありません。</p>',
+          badgeText: 'Sandboxed Runtime',
+        });
         return;
       }
 
-      setSanitizedHTML(refs.fullArticlePreview, parseMarkupToHtml(article.content, attachments));
+      const articleHtml = parseMarkupToHtml(article.content, attachments);
+      setSanitizedHTML(refs.fullArticlePreview, articleHtml);
+
+      mountSandboxedArticleFrame(refs.publicPreviewFrame, {
+        title: article.title,
+        designation: buildArticleDesignation(article),
+        objectClass: article.objectClass,
+        profileName: profile?.name || DEFAULT_PROFILE_NAME,
+        summary: article.summary,
+        articleHtml,
+        customCss: article.customCss,
+        customJs: article.customJs,
+        badgeText: 'Public Runtime Sandbox',
+      });
 
       if (!usedAttachments.length) {
-        renderEmptyState(refs.previewAttachmentList, '使用中の画像はありません。');
-        return;
+        renderEmptyState(refs.previewAttachmentList, '使用中の添付はありません。');
+      } else {
+        refs.previewAttachmentList.innerHTML = '';
+        usedAttachments.forEach((attachment) => {
+          refs.previewAttachmentList.appendChild(createPreviewAttachmentCard(attachment));
+        });
       }
-
-      refs.previewAttachmentList.innerHTML = '';
-      usedAttachments.forEach((attachment) => {
-        refs.previewAttachmentList.appendChild(createPreviewAttachmentCard(attachment));
-      });
     },
 
     renderShare(bundle, warnings = []) {
@@ -409,17 +518,54 @@ export function createUI(handlers) {
       refs.shareWarning.className = warnings.length ? 'warning-text' : 'muted-text';
 
       if (!bundle?.metrics) {
-        refs.shareStatsOutput.textContent = '共有情報はまだ生成されていません。';
+        refs.shareStatsOutput.textContent = '共有データはまだ生成されていません。';
         return;
       }
 
       const stats = bundle.metrics;
-      const savedKb = Math.round(
-        ((stats.savedAttachmentBytes || 0) + (stats.profileIconSavedBytes || 0)) / 1024,
-      );
+      const savedKb = Math.round(((stats.savedAttachmentBytes || 0) + (stats.profileIconSavedBytes || 0)) / 1024);
+      refs.shareStatsOutput.textContent = `URL ${stats.urlLength} 文字 / コード ${stats.tokenLength} 文字 / 使用画像 ${stats.usedAttachmentCount} 枚 / 最適化 ${stats.optimizedAttachmentCount} 枚 / プリセット ${stats.presetLabel} / 削減 ${savedKb}KB`;
+    },
 
-      refs.shareStatsOutput.textContent =
-        `URL ${stats.urlLength} 文字 / コード ${stats.tokenLength} 文字 / 使用画像 ${stats.usedAttachmentCount} 点 / 最適化 ${stats.optimizedAttachmentCount} 点 / 圧縮モード ${stats.presetLabel} / 削減 約${savedKb}KB`;
+    renderPublication(article) {
+      const status = article?.publicationStatus || 'draft';
+      refs.publicationStatusBadge.textContent = PUBLICATION_LABELS[status] || '下書き';
+      refs.publicationStatusBadge.className = 'viewer-pill';
+      refs.publicationSummary.textContent = getPublicationSummary(article);
+      refs.publicUrlOutput.value = article?.publicUrl || '';
+      refs.copyPublicUrlButton.disabled = !article?.publicUrl;
+      refs.openPublicButton.disabled = !article?.publicUrl;
+
+      const noteParts = ['カスタム CSS / JS は sandbox iframe 内でのみ実行します。'];
+      if (article?.customCss?.trim()) {
+        noteParts.push('Custom CSS あり');
+      }
+      if (article?.customJs?.trim()) {
+        noteParts.push('Custom JS あり');
+      }
+      refs.publicationNote.textContent = noteParts.join(' / ');
+
+      refs.publicationIssueList.innerHTML = '';
+      const issues = article?.moderationReport?.issues || [];
+      if (!issues.length) {
+        renderEmptyState(refs.publicationIssueList, '現在のローカル審査結果はありません。');
+        return;
+      }
+
+      issues.forEach((issue) => {
+        const item = document.createElement('article');
+        item.className = `issue-item is-${issue.severity || 'info'}`;
+
+        const heading = document.createElement('strong');
+        heading.textContent = `${issue.code || 'note'} / ${issue.severity || 'info'}`;
+
+        const body = document.createElement('p');
+        body.className = 'muted-text';
+        body.textContent = issue.message || '';
+
+        item.append(heading, body);
+        refs.publicationIssueList.appendChild(item);
+      });
     },
 
     renderBackupText(text) {
@@ -450,6 +596,8 @@ export function createUI(handlers) {
       refs.downloadShareButton.disabled = true;
       refs.copyShareCodeButton.disabled = true;
       refs.openShareButton.disabled = true;
+      refs.copyPublicUrlButton.disabled = true;
+      refs.openPublicButton.disabled = true;
       this.setStatus(message, 'error');
     },
   };

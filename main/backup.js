@@ -8,7 +8,7 @@ function isRecord(value) {
 
 function assertBackupPayloadShape(payload) {
   if (!isRecord(payload)) {
-    throw new Error('バックアップ文字列の形式が不正です。');
+    throw new Error('バックアップ文字列の形式が正しくありません。');
   }
 
   if (payload.version !== APP_VERSION) {
@@ -16,7 +16,7 @@ function assertBackupPayloadShape(payload) {
   }
 
   if (!isRecord(payload.profile) || !isRecord(payload.settings)) {
-    throw new Error('プロフィールまたは設定が欠けています。');
+    throw new Error('プロフィールまたは設定データが壊れています。');
   }
 
   if (!Array.isArray(payload.articles) || !Array.isArray(payload.attachments)) {
@@ -35,19 +35,11 @@ export function parseBackupString(text, userKey) {
     throw new Error('バックアップ文字列が空です。');
   }
 
-  let decoded = '';
   let payload = null;
-
   try {
-    decoded = decodeBase64Utf8(trimmed);
+    payload = JSON.parse(decodeBase64Utf8(trimmed));
   } catch {
-    throw new Error('Base64の復号に失敗しました。');
-  }
-
-  try {
-    payload = JSON.parse(decoded);
-  } catch {
-    throw new Error('バックアップ文字列がJSONとして不正です。');
+    throw new Error('バックアップ文字列の復元に失敗しました。');
   }
 
   assertBackupPayloadShape(payload);

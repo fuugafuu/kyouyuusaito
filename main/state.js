@@ -11,7 +11,6 @@ export function createMainState() {
     currentView: 'dashboard',
     currentTab: 'edit',
     dirty: false,
-    lastShareUrl: '',
     lastShareBundle: null,
     isSaving: false,
   };

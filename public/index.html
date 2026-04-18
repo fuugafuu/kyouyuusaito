@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Public Reader</title>
+    <meta
+      name="description"
+      content="SCP Sandbox Editor の公開用閲覧サイト。公開URLトークン、公開コード、ローカル公開アーカイブを表示します。"
+    >
+    <link rel="stylesheet" href="/public/styles.css">
+  </head>
+  <body>
+    <div class="public-shell">
+      <header class="public-masthead">
+        <div>
+          <p class="eyebrow">Public Reader / Sandbox Release</p>
+          <h1 id="publicTitle">SCP Public Reader</h1>
+          <p id="publicStatus" class="public-status is-info">
+            公開URL、公開コード、または同じブラウザ内のローカル公開アーカイブから記事を読み込みます。
+          </p>
+        </div>
+
+        <nav class="public-links">
+          <a href="/main">Editor</a>
+          <a href="/share">Share</a>
+          <a href="/admin">Admin</a>
+        </nav>
+      </header>
+
+      <div class="public-grid">
+        <aside class="public-sidebar">
+          <section class="public-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Import</p>
+                <h2>公開データを読む</h2>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>公開URL / 公開コード</span>
+              <textarea
+                id="publicImportInput"
+                rows="8"
+                placeholder="ここに公開URLまたは公開コードを貼り付けます。"
+              ></textarea>
+            </label>
+
+            <div class="button-grid">
+              <button id="publicLoadButton" type="button">読み込む</button>
+              <button id="publicPasteButton" type="button" class="secondary-button">貼り付け</button>
+              <label class="file-button">
+                公開ファイル
+                <input id="publicFileInput" type="file" accept=".scp-public,.scp-share,text/plain">
+              </label>
+              <button id="publicClearButton" type="button" class="secondary-button">クリア</button>
+            </div>
+
+            <p id="publicEntryUrl" class="muted-text mono-note"></p>
+          </section>
+
+          <section class="public-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Local Archive</p>
+                <h2>ローカル公開一覧</h2>
+              </div>
+            </div>
+            <p id="publicArchiveHint" class="muted-text">
+              ここに出るのはこのブラウザで承認済みの記事だけです。トークン公開は別端末でも開けます。
+            </p>
+            <div id="publicArchiveList" class="archive-list"></div>
+          </section>
+        </aside>
+
+        <main class="public-main">
+          <section class="public-card hero-card">
+            <div class="hero-grid">
+              <div>
+                <p class="eyebrow compact">Designation</p>
+                <h2 id="publicDesignation">未選択</h2>
+              </div>
+
+              <div class="meta-pills">
+                <span id="publicObjectClass" class="meta-pill">Object Class: --</span>
+                <span id="publicSource" class="meta-pill">Source: --</span>
+                <span id="publicAuthor" class="meta-pill">Author: --</span>
+              </div>
+            </div>
+
+            <p id="publicSummary" class="hero-summary">
+              公開記事が読み込まれると、ここに要約が表示されます。
+            </p>
+          </section>
+
+          <section class="public-card frame-card">
+            <iframe id="publicArticleFrame" class="public-frame" title="公開記事"></iframe>
+          </section>
+
+          <section class="public-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow compact">Attachments</p>
+                <h2>添付画像</h2>
+              </div>
+            </div>
+            <div id="publicAttachmentList" class="attachment-grid"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      window.addEventListener('error', (event) => {
+        const target = document.querySelector('#publicStatus');
+        if (!target || !event?.message) {
+          return;
+        }
+        target.textContent = `Public Reader Error: ${event.error?.stack || event.message}`;
+        target.className = 'public-status is-error';
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const target = document.querySelector('#publicStatus');
+        if (!target) {
+          return;
+        }
+        const reason =
+          event?.reason?.stack || event?.reason?.message || String(event?.reason || 'Unknown error');
+        target.textContent = `Public Reader Error: ${reason}`;
+        target.className = 'public-status is-error';
+      });
+    </script>
+    <script type="module" src="/public/app.js"></script>
+  </body>
+</html>

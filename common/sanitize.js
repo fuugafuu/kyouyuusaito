@@ -23,6 +23,8 @@ const ALLOWED_TAGS = new Set([
   'DETAILS',
   'DIV',
   'EM',
+  'FIGCAPTION',
+  'FIGURE',
   'H1',
   'H2',
   'H3',
@@ -30,9 +32,10 @@ const ALLOWED_TAGS = new Set([
   'IMG',
   'P',
   'PRE',
-  'SUMMARY',
+  'SECTION',
   'SPAN',
   'STRONG',
+  'SUMMARY',
 ]);
 
 const ALLOWED_ATTRIBUTES = {
@@ -43,12 +46,12 @@ const ALLOWED_ATTRIBUTES = {
 };
 
 function isSafeHref(value) {
-  const trimmed = value.trim();
+  const trimmed = String(value || '').trim();
   return /^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed) || trimmed.startsWith('#');
 }
 
 function isSafeImageSource(value) {
-  const trimmed = value.trim();
+  const trimmed = String(value || '').trim();
   return (
     /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,/i.test(trimmed) ||
     /^https?:\/\//i.test(trimmed) ||

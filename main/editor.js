@@ -17,7 +17,7 @@ function wrapSelection(textarea, before, after, fallbackText) {
 function prefixSelectionLines(textarea, prefix) {
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
-  const selected = textarea.value.slice(start, end) || '引用文';
+  const selected = textarea.value.slice(start, end) || '引用';
   const replaced = selected
     .split('\n')
     .map((line) => `${prefix}${line}`)
@@ -32,9 +32,7 @@ function wrapSelectionAsBlock(textarea, fence, fallbackText) {
   const selected = textarea.value.slice(start, end).trim() || fallbackText;
   const prefix = start > 0 && textarea.value[start - 1] !== '\n' ? '\n' : '';
   const suffix = end < textarea.value.length && textarea.value[end] !== '\n' ? '\n' : '';
-  const block = `${prefix}${fence}\n${selected}\n${fence}${suffix}`;
-
-  replaceRange(textarea, block, start, end);
+  replaceRange(textarea, `${prefix}${fence}\n${selected}\n${fence}${suffix}`, start, end);
 }
 
 function wrapSelectionAsCollapsible(textarea, title, fallbackText, { open = false } = {}) {
@@ -44,9 +42,12 @@ function wrapSelectionAsCollapsible(textarea, title, fallbackText, { open = fals
   const prefix = start > 0 && textarea.value[start - 1] !== '\n' ? '\n' : '';
   const suffix = end < textarea.value.length && textarea.value[end] !== '\n' ? '\n' : '';
   const directive = open ? 'fold-open' : 'fold';
-  const block = `${prefix}[[${directive}:${title}]]\n${selected}\n[[/fold]]${suffix}`;
-
-  replaceRange(textarea, block, start, end);
+  replaceRange(
+    textarea,
+    `${prefix}[[${directive}:${title}]]\n${selected}\n[[/fold]]${suffix}`,
+    start,
+    end,
+  );
 }
 
 export function createEditorController({
@@ -62,8 +63,7 @@ export function createEditorController({
   let currentTab = 'edit';
 
   function renderPreview() {
-    const html = parseMarkupToHtml(textarea.value, currentAttachments);
-    setSanitizedHTML(preview, html);
+    setSanitizedHTML(preview, parseMarkupToHtml(textarea.value, currentAttachments));
   }
 
   function updateTabButtons() {
@@ -89,7 +89,7 @@ export function createEditorController({
   function handleToolbar(command) {
     switch (command) {
       case 'bold':
-        wrapSelection(textarea, '**', '**', '太字テキスト');
+        wrapSelection(textarea, '**', '**', '強調テキスト');
         break;
       case 'italic':
         wrapSelection(textarea, '//', '//', '斜体テキスト');
@@ -119,7 +119,7 @@ export function createEditorController({
         );
         break;
       case 'fold':
-        wrapSelectionAsCollapsible(textarea, '折りたたみタイトル', 'ここに閉じておきたい本文を書く');
+        wrapSelectionAsCollapsible(textarea, '折りたたみタイトル', 'ここに収納したい本文を書く');
         break;
       case 'image':
         onImageCommand?.();
@@ -137,15 +137,11 @@ export function createEditorController({
   });
 
   tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      setTab(button.dataset.tab || 'edit');
-    });
+    button.addEventListener('click', () => setTab(button.dataset.tab || 'edit'));
   });
 
   toolbarButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      handleToolbar(button.dataset.command || '');
-    });
+    button.addEventListener('click', () => handleToolbar(button.dataset.command || ''));
   });
 
   return {
@@ -166,9 +162,13 @@ export function createEditorController({
     setTab,
 
     insertAttachment(attachment) {
-      const alt = String(attachment?.name || '添付画像').replaceAll(']', '');
-      const token = `[[attachment:${attachment.id}|${alt}]]`;
-      replaceRange(textarea, token, textarea.selectionStart, textarea.selectionEnd);
+      const alt = String(attachment?.name || 'attachment').replaceAll(']', '');
+      replaceRange(
+        textarea,
+        `[[attachment:${attachment.id}|${alt}]]`,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+      );
     },
 
     renderPreview,

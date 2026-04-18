@@ -94,9 +94,7 @@ function createIndexedDbAdapter(userKey) {
     },
 
     async getProfile() {
-      return withStore(STORE_NAMES.profile, 'readonly', (store) =>
-        requestToPromise(store.get(userKey)),
-      );
+      return withStore(STORE_NAMES.profile, 'readonly', (store) => requestToPromise(store.get(userKey)));
     },
 
     async saveProfile(profile) {
@@ -107,9 +105,7 @@ function createIndexedDbAdapter(userKey) {
     },
 
     async getSettings() {
-      return withStore(STORE_NAMES.settings, 'readonly', (store) =>
-        requestToPromise(store.get(SETTINGS_KEY)),
-      );
+      return withStore(STORE_NAMES.settings, 'readonly', (store) => requestToPromise(store.get(SETTINGS_KEY)));
     },
 
     async saveSettings(settings) {
@@ -137,16 +133,13 @@ function createIndexedDbAdapter(userKey) {
     },
 
     async listAttachments() {
-      return withStore(STORE_NAMES.attachments, 'readonly', (store) =>
-        requestToPromise(store.getAll()),
-      );
+      return withStore(STORE_NAMES.attachments, 'readonly', (store) => requestToPromise(store.getAll()));
     },
 
     async listAttachmentsByArticle(articleId) {
-      return withStore(STORE_NAMES.attachments, 'readonly', (store) => {
-        const index = store.index('articleId');
-        return requestToPromise(index.getAll(articleId));
-      });
+      return withStore(STORE_NAMES.attachments, 'readonly', (store) =>
+        requestToPromise(store.index('articleId').getAll(articleId)),
+      );
     },
 
     async saveAttachment(attachment) {
@@ -255,8 +248,10 @@ function createLocalStorageAdapter(userKey) {
     },
 
     async deleteArticle(articleId) {
-      const articles = read(keys.articles, []).filter((item) => item.id !== articleId);
-      write(keys.articles, articles);
+      write(
+        keys.articles,
+        read(keys.articles, []).filter((item) => item.id !== articleId),
+      );
     },
 
     async listAttachments() {
@@ -280,8 +275,10 @@ function createLocalStorageAdapter(userKey) {
     },
 
     async deleteAttachment(attachmentId) {
-      const attachments = read(keys.attachments, []).filter((item) => item.id !== attachmentId);
-      write(keys.attachments, attachments);
+      write(
+        keys.attachments,
+        read(keys.attachments, []).filter((item) => item.id !== attachmentId),
+      );
     },
 
     async clearAll() {
@@ -304,11 +301,7 @@ export async function createStorageService(userKey) {
   if ('indexedDB' in window) {
     try {
       adapter = createIndexedDbAdapter(userKey);
-      await withTimeout(
-        adapter.init(),
-        INDEXED_DB_INIT_TIMEOUT_MS,
-        'IndexedDB initialization timed out.',
-      );
+      await withTimeout(adapter.init(), INDEXED_DB_INIT_TIMEOUT_MS, 'IndexedDB initialization timed out.');
     } catch {
       adapter = null;
     }
@@ -377,15 +370,13 @@ export async function createStorageService(userKey) {
     },
 
     async listAttachments() {
-      const attachments = await adapter.listAttachments();
-      return attachments
+      return (await adapter.listAttachments())
         .map((attachment) => normalizeAttachment(attachment))
         .filter((attachment) => attachment.data);
     },
 
     async listAttachmentsByArticle(articleId) {
-      const attachments = await adapter.listAttachmentsByArticle(articleId);
-      return attachments
+      return (await adapter.listAttachmentsByArticle(articleId))
         .map((attachment) => normalizeAttachment(attachment))
         .filter((attachment) => attachment.data);
     },

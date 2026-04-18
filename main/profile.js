@@ -58,7 +58,7 @@ export function createProfileController({
       updatePreview();
       result.warnings.forEach((message) => onStatus(message, 'warning'));
     } catch (error) {
-      onStatus(`アイコンの取り込みに失敗しました: ${serializeError(error)}`, 'error');
+      onStatus(`アイコンの読み込みに失敗しました: ${serializeError(error)}`, 'error');
     } finally {
       iconInput.value = '';
     }

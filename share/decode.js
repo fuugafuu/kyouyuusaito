@@ -7,12 +7,12 @@ const DIRECT_TOKEN_PATTERN = /\b(?:raw|lzw)\.[A-Za-z0-9_-]+\b/;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 
 function normalizeUrlCandidate(value) {
-  return String(value || '').replace(/[),.!?。、】【」』＞>]+$/g, '');
+  return String(value || '').replace(/[),.!?」』]+$/g, '');
 }
 
 function assertSharePayloadShape(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('共有データの形式が不正です。');
+    throw new Error('共有データの形式が正しくありません。');
   }
 
   if (!payload.article || typeof payload.article !== 'object') {
@@ -20,14 +20,12 @@ function assertSharePayloadShape(payload) {
   }
 
   if (!Array.isArray(payload.attachments)) {
-    throw new Error('添付画像データが不正です。');
+    throw new Error('添付データが壊れています。');
   }
 }
 
 function decodeLegacyPayload(encoded) {
   let decoded = '';
-  let parsed = null;
-
   try {
     decoded = decodeBase64Utf8(decodeURIComponent(encoded));
   } catch {
@@ -35,12 +33,10 @@ function decodeLegacyPayload(encoded) {
   }
 
   try {
-    parsed = JSON.parse(decoded);
+    return JSON.parse(decoded);
   } catch {
-    throw new Error('共有データの JSON が不正です。');
+    throw new Error('共有データの JSON が壊れています。');
   }
-
-  return parsed;
 }
 
 export function extractShareTokenFromText(text) {
@@ -59,7 +55,7 @@ export function extractShareTokenFromText(text) {
         ''
       );
     } catch {
-      // URLらしい文字列でも装飾が混ざることがあるため、下の走査へフォールバックする。
+      return '';
     }
   }
 

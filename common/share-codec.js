@@ -74,21 +74,17 @@ function createBitReader(bytes) {
 
 function bytesToBinaryString(bytes) {
   let binary = '';
-
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
-
   return binary;
 }
 
 function binaryStringToBytes(binary) {
   const bytes = new Uint8Array(binary.length);
-
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
-
   return bytes;
 }
 
@@ -161,9 +157,8 @@ function lzwDecompressBytes(bytes) {
     let entry = dictionary[code];
     if (entry == null || entry === '') {
       if (code !== nextCode) {
-        throw new Error('共有データの展開に失敗しました。');
+        throw new Error('共有データの復元に失敗しました。');
       }
-
       entry = previous + previous[0];
     }
 
@@ -202,7 +197,19 @@ function packPayload(payload) {
   return {
     v: Number(payload?.version) || 1,
     p: [String(payload?.profile?.name || ''), packImageSource(payload?.profile?.icon || '')],
-    a: [String(payload?.article?.title || ''), String(payload?.article?.content || '')],
+    a: [
+      String(payload?.article?.title || ''),
+      String(payload?.article?.content || ''),
+      String(payload?.article?.series || ''),
+      Number(payload?.article?.articleNumber) || 0,
+      String(payload?.article?.objectClass || ''),
+      String(payload?.article?.slug || ''),
+      String(payload?.article?.summary || ''),
+      String(payload?.article?.customCss || ''),
+      String(payload?.article?.customJs || ''),
+      Number(payload?.article?.publishedAt) || 0,
+      Number(payload?.article?.updatedAt) || 0,
+    ],
     m: Array.isArray(payload?.attachments)
       ? payload.attachments
           .map((attachment) => {
@@ -225,11 +232,11 @@ function packPayload(payload) {
 
 function unpackPayload(compact) {
   if (!compact || typeof compact !== 'object') {
-    throw new Error('共有データの形式が不正です。');
+    throw new Error('共有データの形式が正しくありません。');
   }
 
   const profile = Array.isArray(compact.p) ? compact.p : ['', null];
-  const article = Array.isArray(compact.a) ? compact.a : ['', ''];
+  const article = Array.isArray(compact.a) ? compact.a : [];
   const attachments = Array.isArray(compact.m) ? compact.m : [];
 
   return {
@@ -241,6 +248,15 @@ function unpackPayload(compact) {
     article: {
       title: String(article[0] || ''),
       content: String(article[1] || ''),
+      series: String(article[2] || ''),
+      articleNumber: Number(article[3]) || null,
+      objectClass: String(article[4] || ''),
+      slug: String(article[5] || ''),
+      summary: String(article[6] || ''),
+      customCss: String(article[7] || ''),
+      customJs: String(article[8] || ''),
+      publishedAt: Number(article[9]) || 0,
+      updatedAt: Number(article[10]) || 0,
     },
     attachments: attachments
       .map((item) => {
@@ -265,7 +281,8 @@ export function encodeSharePayloadToken(payload) {
   const json = JSON.stringify(packPayload(payload));
   const rawBytes = encodeUtf8Bytes(json);
   const compressedBytes = lzwCompressBytes(rawBytes);
-  const shouldUseCompressed = compressedBytes.length + LZW_PREFIX.length < rawBytes.length + RAW_PREFIX.length;
+  const shouldUseCompressed =
+    compressedBytes.length + LZW_PREFIX.length < rawBytes.length + RAW_PREFIX.length;
 
   return shouldUseCompressed
     ? `${LZW_PREFIX}${bytesToBase64Url(compressedBytes)}`
@@ -279,14 +296,12 @@ export function decodeSharePayloadToken(token) {
   }
 
   let json = '';
-
   if (normalized.startsWith(LZW_PREFIX)) {
-    const bytes = base64UrlToBytes(normalized.slice(LZW_PREFIX.length));
-    json = decodeUtf8Bytes(lzwDecompressBytes(bytes));
+    json = decodeUtf8Bytes(lzwDecompressBytes(base64UrlToBytes(normalized.slice(LZW_PREFIX.length))));
   } else if (normalized.startsWith(RAW_PREFIX)) {
     json = decodeUtf8Bytes(base64UrlToBytes(normalized.slice(RAW_PREFIX.length)));
   } else {
-    throw new Error('共有コードの形式が不正です。');
+    throw new Error('共有コードの形式が正しくありません。');
   }
 
   return unpackPayload(JSON.parse(json));

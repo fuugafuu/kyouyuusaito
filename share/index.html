@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SCP Shared Viewer</title>
+    <meta
+      name="description"
+      content="SCP Sandbox Editor で生成した共有URL、共有コード、共有ファイルを読み込む閲覧専用ビューア。"
+    >
     <link rel="stylesheet" href="/share/styles.css">
   </head>
   <body>
@@ -15,13 +19,13 @@
           <p class="eyebrow">Shared Viewer / Read Only</p>
           <h1 id="viewerArticleTitle">共有ビューア</h1>
           <p id="viewerStatus" class="viewer-status is-info">
-            共有URL、共有コード、受信用メッセージ、共有ファイルのいずれでも読み込めます。
+            共有URL、共有コード、共有ファイルのいずれかを読み込むと閲覧専用の記事が表示されます。
           </p>
         </div>
 
         <div class="viewer-header-actions">
-          <a class="viewer-link-button" href="/main">エディタへ戻る</a>
-          <button id="viewerResetButton" type="button" class="secondary-button">初期状態に戻す</button>
+          <a class="viewer-link-button" href="/main">Editor へ戻る</a>
+          <button id="viewerResetButton" type="button" class="secondary-button">初期状態へ戻す</button>
         </div>
       </header>
 
@@ -36,17 +40,17 @@
             </div>
 
             <label class="field">
-              <span>共有URL / 共有コード / 受信用メッセージ</span>
+              <span>共有URL / 共有コード / 共有パッケージ</span>
               <textarea
                 id="viewerImportInput"
                 rows="8"
-                placeholder="ここに共有URLや共有コード、または受信用メッセージ全体を貼り付けます"
+                placeholder="ここに共有URL、共有コード、または共有パッケージ全文を貼り付けます。"
               ></textarea>
             </label>
 
             <div class="button-grid">
-              <button id="viewerLoadButton" type="button">この内容を開く</button>
-              <button id="viewerPasteButton" type="button" class="secondary-button">クリップボード貼り付け</button>
+              <button id="viewerLoadButton" type="button">読み込む</button>
+              <button id="viewerPasteButton" type="button" class="secondary-button">クリップボードを貼り付け</button>
               <label class="file-button">
                 共有ファイルを読む
                 <input id="viewerFileInput" type="file" accept=".scp-share,text/plain">
@@ -55,18 +59,18 @@
             </div>
 
             <div class="viewer-tips">
-              <p>LINE やスマホでURLが長すぎる場合は、短い共有ビューURLと共有コードを一緒に送る運用が安全です。</p>
+              <p>URL が長すぎて LINE やスマホで崩れる場合は、共有コードや共有ファイルが安定します。</p>
               <p id="viewerEntryUrl" class="mono-note"></p>
             </div>
           </section>
 
           <section class="viewer-card viewer-profile-card">
             <div class="viewer-profile">
-              <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有プロフィールアイコン">
+              <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有者アイコン">
               <div>
                 <p class="eyebrow compact">Profile</p>
-                <h2 id="viewerProfileName">財団職員</h2>
-                <p class="muted-text">共有ビューのため編集はできません。</p>
+                <h2 id="viewerProfileName">匿名職員</h2>
+                <p class="muted-text">共有記事のプロフィール表示です。</p>
               </div>
             </div>
 
@@ -88,18 +92,18 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow compact">Recovered Payload</p>
-                <h2>共有内容</h2>
+                <h2>共有の状態</h2>
               </div>
               <span id="viewerSourceLabel" class="viewer-pill">No Data</span>
             </div>
             <p id="viewerSummary" class="muted-text">
-              共有データがまだ読み込まれていません。上の入力欄から共有URLや共有コードを読み込めます。
+              共有データが読み込まれると、本文と添付画像がここに表示されます。
             </p>
           </section>
 
           <article id="viewerArticleContent" class="viewer-paper rendered-article">
             <p class="empty-preview">
-              読み込まれた共有記事はここに表示されます。危険なHTMLはサニタイズしてから描画します。
+              共有データを読み込むと本文がここに表示されます。危険な HTML はサニタイズしてから描画します。
             </p>
           </article>
 
@@ -122,7 +126,7 @@
         if (!target || !event?.message) {
           return;
         }
-        target.textContent = `共有ビュー初期化エラー: ${event.error?.stack || event.message}`;
+        target.textContent = `共有ビューアエラー: ${event.error?.stack || event.message}`;
         target.className = 'viewer-status is-error';
       });
 
@@ -132,8 +136,8 @@
           return;
         }
         const reason =
-          event?.reason?.stack || event?.reason?.message || String(event?.reason || '不明なエラー');
-        target.textContent = `共有ビュー初期化エラー: ${reason}`;
+          event?.reason?.stack || event?.reason?.message || String(event?.reason || 'Unknown error');
+        target.textContent = `共有ビューアエラー: ${reason}`;
         target.className = 'viewer-status is-error';
       });
     </script>

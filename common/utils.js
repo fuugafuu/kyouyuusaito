@@ -5,38 +5,34 @@ import {
 } from './constants.js';
 
 export function getCookie(name) {
-  const cookie = document.cookie
+  return document.cookie
     .split(';')
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(`${name}=`));
-  return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : '';
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || '';
 }
 
 export function setCookie(name, value, days = 365) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(
-    value,
-  )}; expires=${expires}; path=/; SameSite=Lax`;
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
 export function generateId(prefix = 'id') {
-  const cryptoApi = globalThis.crypto;
-  if (cryptoApi?.randomUUID) {
-    return `${prefix}-${cryptoApi.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+  if (crypto?.randomUUID) {
+    return `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
   }
 
-  if (cryptoApi?.getRandomValues) {
+  if (crypto?.getRandomValues) {
     const buffer = new Uint8Array(10);
-    cryptoApi.getRandomValues(buffer);
-    const random = Array.from(buffer, (value) => value.toString(16).padStart(2, '0')).join('');
-    return `${prefix}-${random}`;
+    crypto.getRandomValues(buffer);
+    return `${prefix}-${Array.from(buffer, (item) => item.toString(16).padStart(2, '0')).join('')}`;
   }
 
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function ensureUserKey() {
-  let userKey = getCookie(COOKIE_NAME_USER_KEY);
+  let userKey = decodeURIComponent(getCookie(COOKIE_NAME_USER_KEY) || '');
   if (!userKey) {
     userKey = generateId('user');
     setCookie(COOKIE_NAME_USER_KEY, userKey);
@@ -57,8 +53,7 @@ export function bytesToBase64(bytes) {
   const chunkSize = 0x8000;
 
   for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
 
   return btoa(binary);
@@ -67,22 +62,10 @@ export function bytesToBase64(bytes) {
 export function base64ToBytes(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
-
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
-
   return bytes;
-}
-
-export function encodeBase64Utf8(text) {
-  const encoder = new TextEncoder();
-  return bytesToBase64(encoder.encode(text));
-}
-
-export function decodeBase64Utf8(base64) {
-  const decoder = new TextDecoder();
-  return decoder.decode(base64ToBytes(base64));
 }
 
 export function encodeUtf8Bytes(text) {
@@ -93,8 +76,16 @@ export function decodeUtf8Bytes(bytes) {
   return new TextDecoder().decode(bytes);
 }
 
+export function encodeBase64Utf8(text) {
+  return bytesToBase64(encodeUtf8Bytes(text));
+}
+
+export function decodeBase64Utf8(base64) {
+  return decodeUtf8Bytes(base64ToBytes(base64));
+}
+
 export function bytesToBase64Url(bytes) {
-  return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  return bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
 }
 
 export function base64UrlToBytes(base64Url) {
@@ -102,7 +93,6 @@ export function base64UrlToBytes(base64Url) {
     .replaceAll('-', '+')
     .replaceAll('_', '/')
     .padEnd(Math.ceil(String(base64Url || '').length / 4) * 4, '=');
-
   return base64ToBytes(normalized);
 }
 
@@ -120,7 +110,7 @@ export function escapeAttribute(value = '') {
 }
 
 export function formatDateTime(timestamp) {
-  if (!Number.isFinite(timestamp)) {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return '未保存';
   }
 
@@ -132,31 +122,31 @@ export function formatDateTime(timestamp) {
 
 export async function copyText(text) {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
+    await navigator.clipboard.writeText(String(text ?? ''));
     return;
   }
 
   const textarea = document.createElement('textarea');
-  textarea.value = text;
+  textarea.value = String(text ?? '');
   textarea.setAttribute('readonly', 'readonly');
   textarea.style.position = 'fixed';
   textarea.style.opacity = '0';
   document.body.appendChild(textarea);
   textarea.select();
   document.execCommand('copy');
-  document.body.removeChild(textarea);
+  textarea.remove();
 }
 
 export async function readClipboardText() {
   if (!navigator.clipboard?.readText) {
-    throw new Error('クリップボード読み取りに対応していません。');
+    throw new Error('この環境ではクリップボード読み取りに対応していません。');
   }
 
   return navigator.clipboard.readText();
 }
 
 export function downloadTextFile(filename, text, mimeType = 'text/plain;charset=utf-8') {
-  const blob = new Blob([text], { type: mimeType });
+  const blob = new Blob([String(text ?? '')], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -183,12 +173,11 @@ export function serializeError(error) {
   if (error instanceof Error) {
     return error.message;
   }
-
   return typeof error === 'string' ? error : '不明なエラーが発生しました。';
 }
 
 export function isSupportedImageType(mimeType) {
-  return SUPPORTED_IMAGE_TYPES.includes(mimeType);
+  return SUPPORTED_IMAGE_TYPES.includes(String(mimeType || '').toLowerCase());
 }
 
 export function isSafeHttpUrl(value) {
@@ -201,11 +190,11 @@ export function isSafeHttpUrl(value) {
 }
 
 export function isSafeImageSource(value, { allowDefault = false, allowRemote = false } = {}) {
-  if (typeof value !== 'string' || !value.trim()) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
     return false;
   }
 
-  const trimmed = value.trim();
   if (allowDefault && trimmed === DEFAULT_PROFILE_ICON) {
     return true;
   }
@@ -214,11 +203,15 @@ export function isSafeImageSource(value, { allowDefault = false, allowRemote = f
     return true;
   }
 
+  if (/^blob:/i.test(trimmed)) {
+    return true;
+  }
+
   return allowRemote ? isSafeHttpUrl(trimmed) : false;
 }
 
 export function estimateDataUrlBytes(dataUrl = '') {
-  const [header = '', payload = ''] = dataUrl.split(',', 2);
+  const [header = '', payload = ''] = String(dataUrl || '').split(',', 2);
   if (!payload) {
     return 0;
   }
@@ -256,7 +249,7 @@ export function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました。'));
+    reader.onerror = () => reject(new Error('画像データの読み込みに失敗しました。'));
     reader.readAsDataURL(file);
   });
 }
@@ -294,6 +287,8 @@ export async function resizeImageFileToDataUrl(
       mimeType: file.type,
       approxBytes: file.size,
       wasCompressed: false,
+      width: 0,
+      height: 0,
     };
   }
 
@@ -330,7 +325,7 @@ export async function resizeImageDataUrl(
   const source = String(dataUrl || '').trim();
   const parts = splitDataUrl(source);
   if (!parts) {
-    throw new Error('画像データの形式が不正です。');
+    throw new Error('画像データの形式が正しくありません。');
   }
 
   if (parts.mimeType === 'image/gif') {
@@ -339,6 +334,8 @@ export async function resizeImageDataUrl(
       mimeType: parts.mimeType,
       approxBytes: estimateDataUrlBytes(source),
       wasCompressed: false,
+      width: 0,
+      height: 0,
     };
   }
 
@@ -377,7 +374,31 @@ export function escapeRegExp(value) {
 }
 
 export function readHashParam(name, hash = window.location.hash) {
-  const fragment = hash.startsWith('#') ? hash.slice(1) : hash;
+  const fragment = String(hash || '').startsWith('#') ? String(hash || '').slice(1) : String(hash || '');
   const params = new URLSearchParams(fragment);
   return params.get(name) || '';
+}
+
+export function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
+export function slugify(value, fallback = 'untitled') {
+  const normalized = String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return normalized || fallback;
+}
+
+export async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', encodeUtf8Bytes(String(value || '')));
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

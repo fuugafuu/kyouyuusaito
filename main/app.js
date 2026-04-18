@@ -4,13 +4,25 @@ import {
   SHARE_URL_WARN_LENGTH,
 } from '../common/constants.js';
 import { createEmptyArticle } from '../common/models.js';
-import { copyText, downloadTextFile, ensureUserKey, serializeError } from '../common/utils.js';
+import { runPublicationAudit } from '../common/moderation.js';
+import {
+  copyText,
+  downloadTextFile,
+  ensureUserKey,
+  serializeError,
+} from '../common/utils.js';
 import { createAttachmentsFromFiles, removeAttachmentFromArticle } from './attachments.js';
 import { exportBackupString, restoreBackupString } from './backup.js';
 import { createEditorController } from './editor.js';
 import { createProfileController } from './profile.js';
 import { buildShareBundle, buildSharePackageText, getShareWarnings } from './share.js';
-import { createMainState, getCurrentArticle, removeArticle, sortArticlesInState, upsertArticle } from './state.js';
+import {
+  createMainState,
+  getCurrentArticle,
+  removeArticle,
+  sortArticlesInState,
+  upsertArticle,
+} from './state.js';
 import { createStorageService } from './storage.js';
 import { createUI } from './ui.js';
 
@@ -43,20 +55,48 @@ function setCurrentView(view, { syncHash = true } = {}) {
 }
 
 function invalidateShareBundle() {
-  state.lastShareUrl = '';
   state.lastShareBundle = null;
 }
 
-function renderWorkspace() {
+function resetPublicationState(article) {
+  return {
+    ...article,
+    publicationStatus: 'draft',
+    publicToken: '',
+    publicUrl: '',
+    publishedAt: 0,
+    reviewedAt: 0,
+    moderationReport: null,
+  };
+}
+
+function updateComposeMetaText(article) {
+  if (!ui?.refs?.articleMeta) {
+    return;
+  }
+
+  if (!article) {
+    ui.refs.articleMeta.textContent = '記事が選択されていません。';
+    return;
+  }
+
+  const designation = article.articleNumber ? `${article.series}-${String(article.articleNumber).padStart(3, '0')}` : article.series;
+  ui.refs.articleMeta.textContent = `${state.dirty ? '未保存 / ' : ''}${designation} / 最終更新: ${new Intl.DateTimeFormat('ja-JP', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(article.updatedAt)}`;
+}
+
+function renderWorkspace({ preserveEditor = false } = {}) {
   const article = getCurrentArticle(state);
 
   ui.setView(state.currentView);
   ui.renderSettings(state.settings, state.storageMode);
   ui.renderProfilePreview(state.profile);
   ui.renderArticleList(state.articles, state.currentArticleId, state.dirty);
-  ui.renderCurrentArticle(article, state.dirty);
   ui.renderAttachments(state.currentAttachments, state.selectedAttachmentId, article?.content || '');
-  ui.renderPreviewView(article, state.currentAttachments);
+  ui.renderPreviewView(article, state.currentAttachments, state.profile);
+  ui.renderPublication(article);
   ui.renderDashboard({
     articles: state.articles,
     currentArticle: article,
@@ -66,15 +106,15 @@ function renderWorkspace() {
   });
   ui.renderShare(state.lastShareBundle, state.lastShareBundle?.warnings || []);
 
-  editor.setContent(article?.content || '');
-  editor.setAttachments(state.currentAttachments);
-  editor.setTab(state.currentTab);
-}
+  if (!preserveEditor) {
+    ui.renderCurrentArticle(article, state.dirty);
+    editor.setContent(article?.content || '');
+    editor.setTab(state.currentTab);
+  } else {
+    updateComposeMetaText(article);
+  }
 
-function markDirty() {
-  state.dirty = true;
-  invalidateShareBundle();
-  renderWorkspace();
+  editor.setAttachments(state.currentAttachments);
 }
 
 async function loadCurrentAttachments() {
@@ -88,7 +128,7 @@ async function ensureInitialArticle() {
     return;
   }
 
-  const article = await storage.saveArticle(createEmptyArticle());
+  const article = await storage.saveArticle(createEmptyArticle('新規記事 1'));
   state.articles = [article];
   state.currentArticleId = article.id;
 }
@@ -114,6 +154,7 @@ async function saveCurrentArticle({ silent = false, auto = false } = {}) {
   }
 
   state.isSaving = true;
+
   try {
     const savedArticle = await storage.saveArticle({
       ...article,
@@ -127,10 +168,7 @@ async function saveCurrentArticle({ silent = false, auto = false } = {}) {
     renderWorkspace();
 
     if (!silent) {
-      ui.setStatus(
-        auto ? `自動保存しました: ${savedArticle.title}` : `保存しました: ${savedArticle.title}`,
-        'success',
-      );
+      ui.setStatus(`${auto ? '自動' : ''}保存しました: ${savedArticle.title}`, 'success');
     }
 
     return savedArticle;
@@ -148,9 +186,27 @@ async function persistDraftBeforeTransition() {
     await saveCurrentArticle({ silent: true });
     return true;
   } catch (error) {
-    ui.setStatus(`未保存内容の保存に失敗したため切り替えを中止しました: ${serializeError(error)}`, 'error');
+    ui.setStatus(`保存に失敗したため画面を切り替えられません: ${serializeError(error)}`, 'error');
     return false;
   }
+}
+
+function applyArticlePatch(patch, { preserveEditor = true } = {}) {
+  const article = getCurrentArticle(state);
+  if (!article) {
+    return;
+  }
+
+  const nextArticle = resetPublicationState({
+    ...article,
+    ...patch,
+  });
+
+  upsertArticle(state, nextArticle);
+  state.currentArticleId = nextArticle.id;
+  state.dirty = true;
+  invalidateShareBundle();
+  renderWorkspace({ preserveEditor });
 }
 
 async function handleSelectArticle(articleId) {
@@ -195,7 +251,7 @@ async function handleDeleteArticle() {
     return;
   }
 
-  if (!window.confirm(`「${article.title}」を削除します。添付画像も削除されます。`)) {
+  if (!window.confirm(`「${article.title}」を削除します。添付画像もまとめて削除されます。`)) {
     return;
   }
 
@@ -219,7 +275,6 @@ async function handleAttachmentFiles(files) {
 
   try {
     const result = await createAttachmentsFromFiles(files, article.id);
-
     for (const attachment of result.attachments) {
       const savedAttachment = await storage.saveAttachment(attachment);
       state.currentAttachments.push(savedAttachment);
@@ -229,6 +284,12 @@ async function handleAttachmentFiles(files) {
       state.selectedAttachmentId = savedAttachment.id;
     }
 
+    const nextArticle = resetPublicationState({
+      ...article,
+      attachmentIds: [...new Set(article.attachmentIds)],
+    });
+    upsertArticle(state, nextArticle);
+    state.currentArticleId = nextArticle.id;
     invalidateShareBundle();
     await saveCurrentArticle({ silent: true });
     renderWorkspace();
@@ -236,7 +297,7 @@ async function handleAttachmentFiles(files) {
     if (result.warnings.length > 0) {
       ui.setStatus(result.warnings.join(' '), 'warning');
     } else {
-      ui.setStatus(`${result.attachments.length}件の画像を添付しました。`, 'success');
+      ui.setStatus(`${result.attachments.length} 枚の画像を追加しました。`, 'success');
     }
   } catch (error) {
     ui.setStatus(`添付画像の追加に失敗しました: ${serializeError(error)}`, 'error');
@@ -244,29 +305,25 @@ async function handleAttachmentFiles(files) {
 }
 
 function handleContentChange(content) {
-  const article = getCurrentArticle(state);
-  if (!article) {
-    return;
-  }
-
-  article.content = content;
-  state.currentTab = document.querySelector('[data-tab].is-active')?.dataset.tab || state.currentTab;
-  markDirty();
+  applyArticlePatch({ content }, { preserveEditor: true });
 }
 
 function handleTitleInput(title) {
-  const article = getCurrentArticle(state);
-  if (!article) {
+  applyArticlePatch({ title }, { preserveEditor: true });
+}
+
+function handleMetaChange(field, value) {
+  if (field === 'articleNumber') {
+    applyArticlePatch({ articleNumber: value ? Number(value) : null }, { preserveEditor: true });
     return;
   }
 
-  article.title = title;
-  markDirty();
+  applyArticlePatch({ [field]: value }, { preserveEditor: true });
 }
 
 function handleSelectAttachment(attachmentId) {
   state.selectedAttachmentId = attachmentId;
-  renderWorkspace();
+  renderWorkspace({ preserveEditor: true });
 }
 
 function insertSelectedAttachment() {
@@ -290,13 +347,13 @@ async function handleDeleteAttachment(attachmentId) {
     return;
   }
 
-  if (!window.confirm(`添付画像「${attachment.name}」を削除します。本文中の参照も取り除きます。`)) {
+  if (!window.confirm(`添付画像「${attachment.name}」を削除します。本文中の参照も削除されます。`)) {
     return;
   }
 
   await storage.deleteAttachment(attachmentId);
   state.currentAttachments = state.currentAttachments.filter((item) => item.id !== attachmentId);
-  const nextArticle = removeAttachmentFromArticle(article, attachmentId);
+  const nextArticle = resetPublicationState(removeAttachmentFromArticle(article, attachmentId));
   upsertArticle(state, nextArticle);
   state.currentArticleId = nextArticle.id;
   state.selectedAttachmentId = state.currentAttachments[0]?.id || '';
@@ -309,7 +366,7 @@ async function handleDeleteAttachment(attachmentId) {
 async function handleSaveProfile(profile) {
   state.profile = await storage.saveProfile(profile);
   profileController.setProfile(state.profile, state.userKey);
-  renderWorkspace();
+  renderWorkspace({ preserveEditor: true });
   ui.setStatus('プロフィールを保存しました。', 'success');
 }
 
@@ -318,7 +375,7 @@ async function handleToggleAutoSave(autoSave) {
     ...state.settings,
     autoSave,
   });
-  renderWorkspace();
+  renderWorkspace({ preserveEditor: true });
   ui.setStatus(`自動保存を${autoSave ? '有効' : '無効'}にしました。`, 'info');
 }
 
@@ -331,11 +388,11 @@ async function handleExportBackup() {
 async function handleImportBackup() {
   const text = ui.refs.backupText.value.trim();
   if (!text) {
-    ui.setStatus('復元するバックアップ文字列を入力してください。', 'warning');
+    ui.setStatus('復元するバックアップ文字列を貼り付けてください。', 'warning');
     return;
   }
 
-  if (!window.confirm('現在の保存内容を上書きして復元します。続行しますか？')) {
+  if (!window.confirm('現在の保存内容を上書きして復元します。よろしいですか。')) {
     return;
   }
 
@@ -359,27 +416,28 @@ async function handleGenerateShare() {
       attachments: state.currentAttachments,
       currentUrl: window.location.href,
     });
+
     const warnings = getShareWarnings(bundle);
-    state.lastShareUrl = bundle.url;
     state.lastShareBundle = {
       ...bundle,
       warnings,
     };
+
     setCurrentView('preview');
-    renderWorkspace();
+    renderWorkspace({ preserveEditor: true });
 
     ui.setStatus(
-      warnings.length > 0 ? '共有データを生成しました。警告内容も確認してください。' : '共有データを生成しました。',
-      warnings.length > 0 ? 'warning' : 'success',
+      warnings.length ? '共有URLを生成しました。警告も確認してください。' : '共有URLを生成しました。',
+      warnings.length ? 'warning' : 'success',
     );
   } catch (error) {
-    ui.setStatus(`共有データの生成に失敗しました: ${serializeError(error)}`, 'error');
+    ui.setStatus(`共有URLの生成に失敗しました: ${serializeError(error)}`, 'error');
   }
 }
 
 async function handleCopyShare() {
   if (!state.lastShareBundle?.url) {
-    ui.setStatus('先に共有データを生成してください。', 'warning');
+    ui.setStatus('先に共有URLを生成してください。', 'warning');
     return;
   }
 
@@ -404,12 +462,12 @@ async function handleCopySharePackage() {
   }
 
   await copyText(buildSharePackageText(state.lastShareBundle));
-  ui.setStatus('受信用メッセージをコピーしました。', 'success');
+  ui.setStatus('共有パッケージをコピーしました。', 'success');
 }
 
 async function handleSystemShare() {
   if (!state.lastShareBundle?.url) {
-    ui.setStatus('先に共有データを生成してください。', 'warning');
+    ui.setStatus('先に共有URLを生成してください。', 'warning');
     return;
   }
 
@@ -426,14 +484,13 @@ async function handleSystemShare() {
           type: 'text/plain;charset=utf-8',
         })
       : null;
-  const usePackageFallback = (state.lastShareBundle.metrics?.urlLength || 0) > SHARE_URL_WARN_LENGTH;
-  const shareText = usePackageFallback
-    ? buildSharePackageText(state.lastShareBundle)
-    : 'SCP Sandbox Editor から共有されたデータです。';
 
+  const usePackageFallback = (state.lastShareBundle.metrics?.urlLength || 0) > SHARE_URL_WARN_LENGTH;
   const shareData = {
     title: article?.title || 'SCP Share',
-    text: shareText,
+    text: usePackageFallback
+      ? buildSharePackageText(state.lastShareBundle)
+      : 'SCP Sandbox Editor から共有された記事です。',
     url: usePackageFallback ? state.lastShareBundle.baseViewerUrl : state.lastShareBundle.url,
   };
 
@@ -448,6 +505,7 @@ async function handleSystemShare() {
     if (error?.name === 'AbortError') {
       return;
     }
+
     ui.setStatus(`端末共有に失敗しました: ${serializeError(error)}`, 'error');
   }
 }
@@ -471,6 +529,70 @@ function handleOpenShare() {
   }
 
   window.open(state.lastShareBundle.url, '_blank', 'noopener,noreferrer');
+}
+
+async function handleRequestReview() {
+  const article = getCurrentArticle(state);
+  if (!article) {
+    ui.setStatus('審査対象の記事がありません。', 'warning');
+    return;
+  }
+
+  const report = runPublicationAudit({
+    article,
+    articles: state.articles,
+  });
+
+  const nextArticle = {
+    ...article,
+    publicationStatus: 'pending',
+    moderationReport: report,
+    publicToken: '',
+    publicUrl: '',
+    publishedAt: 0,
+    reviewedAt: report.checkedAt,
+  };
+
+  upsertArticle(state, nextArticle);
+  state.currentArticleId = nextArticle.id;
+  state.dirty = false;
+  await saveCurrentArticle({ silent: true });
+  renderWorkspace();
+
+  if (report.status === 'blocked') {
+    ui.setStatus('審査用のローカルチェックで停止項目が見つかりました。Admin で確認してください。', 'warning');
+  } else if (report.status === 'review') {
+    ui.setStatus('審査待ちとして保存しました。Admin で確認してください。', 'warning');
+  } else {
+    ui.setStatus('審査待ちとして保存しました。', 'success');
+  }
+
+  setCurrentView('preview');
+}
+
+async function handleCopyPublicUrl() {
+  const article = getCurrentArticle(state);
+  if (!article?.publicUrl) {
+    ui.setStatus('公開URLはまだありません。Admin で承認してください。', 'warning');
+    return;
+  }
+
+  await copyText(article.publicUrl);
+  ui.setStatus('公開URLをコピーしました。', 'success');
+}
+
+function handleOpenPublic() {
+  const article = getCurrentArticle(state);
+  if (!article?.publicUrl) {
+    ui.setStatus('公開URLはまだありません。Admin で承認してください。', 'warning');
+    return;
+  }
+
+  window.open(article.publicUrl, '_blank', 'noopener,noreferrer');
+}
+
+function handleOpenAdmin() {
+  window.open('/admin', '_blank', 'noopener,noreferrer');
 }
 
 function startAutoSaveLoop() {
@@ -511,7 +633,7 @@ function setupHashRouting() {
     }
 
     state.currentView = nextHash;
-    renderWorkspace();
+    renderWorkspace({ preserveEditor: true });
   });
 }
 
@@ -523,6 +645,7 @@ async function init() {
     onDeleteArticle: handleDeleteArticle,
     onAttachmentFiles: handleAttachmentFiles,
     onTitleInput: handleTitleInput,
+    onMetaChange: handleMetaChange,
     onSelectAttachment: handleSelectAttachment,
     onInsertAttachment: (attachmentId) => {
       handleSelectAttachment(attachmentId);
@@ -539,6 +662,10 @@ async function init() {
     onSystemShare: handleSystemShare,
     onDownloadShare: handleDownloadShare,
     onOpenShare: handleOpenShare,
+    onRequestReview: handleRequestReview,
+    onCopyPublicUrl: handleCopyPublicUrl,
+    onOpenPublic: handleOpenPublic,
+    onOpenAdmin: handleOpenAdmin,
     onViewChange: (view) => setCurrentView(view),
   });
 
@@ -576,7 +703,7 @@ async function init() {
     setupBeforeUnload();
 
     if (state.storageMode === 'localstorage') {
-      ui.setStatus('IndexedDB が使えなかったため localStorage フォールバックで動作しています。', 'warning');
+      ui.setStatus('IndexedDB が使えなかったため localStorage フォールバックで保存しています。', 'warning');
     } else {
       ui.setStatus('IndexedDB で初期化しました。', 'success');
     }

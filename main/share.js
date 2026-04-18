@@ -1,6 +1,7 @@
 import {
   APP_VERSION,
   DEFAULT_PROFILE_ICON,
+  DEFAULT_PROFILE_NAME,
   SHARE_ICON_MAX_DIMENSION,
   SHARE_ICON_QUALITY,
   SHARE_IMAGE_MAX_DIMENSION,
@@ -9,8 +10,8 @@ import {
   SHARE_URL_DANGER_LENGTH,
   SHARE_URL_WARN_LENGTH,
 } from '../common/constants.js';
-import { encodeSharePayloadToken } from '../common/share-codec.js';
 import { extractAttachmentReferences } from '../common/markup.js';
+import { encodeSharePayloadToken } from '../common/share-codec.js';
 import { estimateDataUrlBytes, resizeImageDataUrl, splitDataUrl } from '../common/utils.js';
 
 const SHARE_IMAGE_PRESETS = [
@@ -137,7 +138,6 @@ async function createShareCandidate({
   }
 
   let shareIcon = '';
-  let profileIconOptimized = false;
   let profileIconSavedBytes = 0;
 
   if (profile?.icon && profile.icon !== DEFAULT_PROFILE_ICON) {
@@ -146,14 +146,13 @@ async function createShareCandidate({
       quality: preset.iconQuality,
     });
     shareIcon = optimizedIcon.dataUrl || '';
-    profileIconOptimized = optimizedIcon.optimized;
     profileIconSavedBytes = optimizedIcon.savedBytes;
   }
 
   const payload = {
     version: APP_VERSION,
     profile: {
-      name: profile?.name || '財団職員',
+      name: profile?.name || DEFAULT_PROFILE_NAME,
       icon: shareIcon,
     },
     article: {
@@ -178,7 +177,6 @@ async function createShareCandidate({
       usedAttachmentCount: includedAttachments.length,
       optimizedAttachmentCount,
       savedAttachmentBytes,
-      profileIconOptimized,
       profileIconSavedBytes,
       presetLabel: preset.label,
       imageMaxDimension: preset.maxDimension,
@@ -187,7 +185,12 @@ async function createShareCandidate({
   };
 }
 
-export async function buildShareBundle({ profile, article, attachments, currentUrl = window.location.href }) {
+export async function buildShareBundle({
+  profile,
+  article,
+  attachments,
+  currentUrl = window.location.href,
+}) {
   if (!article) {
     throw new Error('共有対象の記事がありません。');
   }
@@ -225,7 +228,7 @@ export function buildShareUrl(token, currentUrl = window.location.href) {
 }
 
 export function buildViewerEntryUrl(currentUrl = window.location.href) {
-  const current = new URL(currentUrl);
+  const current = new URL(currentUrl, window.location.origin);
   return new URL('/share', current.origin).toString();
 }
 
@@ -235,17 +238,15 @@ export function buildSharePackageText(bundle) {
   }
 
   const articleTitle = String(bundle.payload?.article?.title || '無題記事');
-  const lines = [
-    `SCP Sandbox Editor 共有データ`,
+  return [
+    'SCP Sandbox Editor Share Package',
     `記事タイトル: ${articleTitle}`,
-    `共有ビュー: ${bundle.baseViewerUrl || buildViewerEntryUrl()}`,
-    `共有コード:`,
+    `共有ビューURL: ${bundle.baseViewerUrl || buildViewerEntryUrl()}`,
+    '共有コード:',
     bundle.token,
     '',
-    '長いURLが開けない場合は、このメッセージ全体または共有コードだけを共有ビューへ貼り付けてください。',
-  ];
-
-  return lines.join('\n');
+    'URL が長すぎて使いにくい場合は、この共有コードを /share に貼り付けてください。',
+  ].join('\n');
 }
 
 export function getShareWarnings(bundle) {
@@ -257,17 +258,13 @@ export function getShareWarnings(bundle) {
   }
 
   if (metrics.urlLength > SHARE_URL_DANGER_LENGTH) {
-    warnings.push(
-      '共有URLが非常に長いため、LINE や一部スマホ環境ではリンクとして扱われない可能性があります。受信用メッセージコピー、共有ファイル、共有コードの利用を優先してください。',
-    );
+    warnings.push('共有URLが非常に長いため、LINE や一部スマホブラウザでは開けない可能性があります。共有ファイルや共有コードの併用をおすすめします。');
   } else if (metrics.urlLength > SHARE_URL_WARN_LENGTH) {
-    warnings.push(
-      '共有URLが長めです。モバイルメッセンジャーで不安定な場合は「受信用メッセージコピー」「端末で共有」または共有ファイルを使ってください。',
-    );
+    warnings.push('共有URLが長めです。途中で切れるサービスでは共有コードや共有ファイルを使ってください。');
   }
 
   if (missingAttachmentIds.length > 0) {
-    warnings.push('本文で参照されている添付画像の一部が見つからないため、その画像は共有に含まれていません。');
+    warnings.push('本文で参照されている添付画像の一部が見つからず、共有データに含まれていません。');
   }
 
   return warnings;
