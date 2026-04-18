@@ -40,7 +40,8 @@ export function buildShareData({ profile, article, attachments }) {
 
 export function buildShareUrl(payload, currentUrl = window.location.href) {
   const encoded = encodeURIComponent(encodeBase64Utf8(JSON.stringify(payload)));
-  const sharePageUrl = new URL('../share/index.html', currentUrl);
+  const current = new URL(currentUrl);
+  const sharePageUrl = new URL('/share', current.origin);
   sharePageUrl.hash = `${SHARE_HASH_KEY}=${encoded}`;
   return sharePageUrl.toString();
 }
