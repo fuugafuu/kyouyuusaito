@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Shared Viewer</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="viewer-shell">
+      <header class="viewer-header">
+        <p class="eyebrow">Shared View / Read Only</p>
+        <h1 id="viewerArticleTitle">共有データを読み込み中...</h1>
+        <p id="viewerStatus" class="viewer-status is-info">共有データを解析しています。</p>
+      </header>
+
+      <section class="viewer-profile">
+        <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有プロフィールアイコン">
+        <div>
+          <h2>投稿者</h2>
+          <p id="viewerProfileName">財団職員</p>
+        </div>
+      </section>
+
+      <article id="viewerArticleContent" class="viewer-article rendered-article"></article>
+
+      <section class="viewer-gallery">
+        <h2>添付画像</h2>
+        <div id="viewerAttachmentList" class="viewer-attachment-grid"></div>
+      </section>
+    </main>
+
+    <script>
+      window.addEventListener('error', (event) => {
+        const target = document.querySelector('#viewerStatus');
+        if (!target || !event?.message) {
+          return;
+        }
+        target.textContent = `共有ビュー初期化エラー: ${event.error?.stack || event.message}`;
+        target.className = 'viewer-status is-error';
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const target = document.querySelector('#viewerStatus');
+        if (!target) {
+          return;
+        }
+        const reason =
+          event?.reason?.stack || event?.reason?.message || String(event?.reason || '不明なエラー');
+        target.textContent = `共有ビュー初期化エラー: ${reason}`;
+        target.className = 'viewer-status is-error';
+      });
+    </script>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>

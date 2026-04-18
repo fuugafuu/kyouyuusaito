@@ -1,0 +1,17 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/main"
+    },
+    {
+      "source": "/main",
+      "destination": "/main/index.html"
+    },
+    {
+      "source": "/share",
+      "destination": "/share/index.html"
+    }
+  ]
+}

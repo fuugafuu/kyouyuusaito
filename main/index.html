@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCP Sandbox Editor</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Sandbox / Archive / Internal Use Only</p>
+          <h1>SCP Sandbox Editor</h1>
+          <p class="subhead">Wikidot風の構造を意識した、保存・復元・共有付きのローカル編集環境</p>
+        </div>
+        <div class="topbar-meta">
+          <span id="storageModeBadge" class="storage-badge">保存方式: 判定中</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="section-heading">
+              <h2>プロフィール</h2>
+            </div>
+            <div class="profile-card">
+              <img id="profileIconPreview" class="profile-icon" alt="プロフィールアイコン">
+              <div>
+                <p id="liveProfileName" class="profile-name">財団職員</p>
+                <p id="userKeyDisplay" class="muted-text">userKey: --</p>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>表示名</span>
+              <input id="profileNameInput" type="text" maxlength="40" placeholder="ユーザー名">
+            </label>
+
+            <label class="field">
+              <span>アイコン画像</span>
+              <input
+                id="profileIconInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+              >
+            </label>
+
+            <div class="button-row">
+              <button id="saveProfileButton" type="button">プロフィール保存</button>
+              <button id="resetProfileIconButton" type="button" class="secondary-button">アイコン初期化</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>設定とバックアップ</h2>
+            </div>
+
+            <label class="toggle-row">
+              <input id="autoSaveToggle" type="checkbox">
+              <span>自動保存を有効にする</span>
+            </label>
+
+            <div class="button-row">
+              <button id="exportBackupButton" type="button">バックアップ出力</button>
+              <button id="importBackupButton" type="button" class="secondary-button">バックアップ復元</button>
+            </div>
+
+            <label class="field">
+              <span>バックアップ文字列</span>
+              <textarea
+                id="backupText"
+                rows="7"
+                placeholder="ここにバックアップ文字列を出力・貼り付けします"
+              ></textarea>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>記事一覧</h2>
+              <button id="newArticleButton" type="button">新規作成</button>
+            </div>
+            <ul id="articleList" class="article-list"></ul>
+          </section>
+        </aside>
+
+        <main class="workspace">
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <h2>記事エディタ</h2>
+                <p id="articleMeta" class="muted-text">記事が選択されていません。</p>
+              </div>
+              <div class="button-row">
+                <button id="saveArticleButton" type="button">保存</button>
+                <button id="deleteArticleButton" type="button" class="danger-button">削除</button>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>記事タイトル</span>
+              <input id="articleTitleInput" type="text" placeholder="記事タイトル">
+            </label>
+
+            <div class="toolbar">
+              <button type="button" data-command="bold">太字</button>
+              <button type="button" data-command="italic">斜体</button>
+              <button type="button" data-command="heading">見出し</button>
+              <button type="button" data-command="rule">水平線</button>
+              <button type="button" data-command="quote">引用</button>
+              <button type="button" data-command="link">リンク</button>
+              <button type="button" data-command="image">画像挿入</button>
+            </div>
+
+            <div class="tab-row" role="tablist" aria-label="編集モード">
+              <button type="button" class="tab-button is-active" data-tab="edit" aria-selected="true">編集</button>
+              <button type="button" class="tab-button" data-tab="preview" aria-selected="false">プレビュー</button>
+            </div>
+
+            <textarea
+              id="articleContentInput"
+              class="editor-textarea"
+              rows="18"
+              placeholder="# 見出し&#10;&#10;本文を書く。&#10;**太字** や //斜体//、[[リンク名|https://example.com]]、[[attachment:ID|画像]] を使用できます。"
+            ></textarea>
+
+            <div id="articlePreview" class="rendered-article preview-surface" hidden></div>
+
+            <p class="muted-text">
+              簡易記法: <code>#</code> / <code>##</code> / <code>###</code> 見出し、
+              <code>**太字**</code>、<code>//斜体//</code>、<code>&gt; 引用</code>、
+              <code>---</code>、<code>[[表示名|URL]]</code>、<code>[[attachment:ID|代替文]]</code>
+            </p>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <div>
+                <h2>添付画像</h2>
+                <p class="muted-text">SVGは安全のため受け付けません。大きい画像は圧縮保存します。</p>
+              </div>
+              <label class="file-button">
+                画像を追加
+                <input
+                  id="attachmentInput"
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                >
+              </label>
+            </div>
+
+            <div id="attachmentList" class="attachment-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>共有</h2>
+              <div class="button-row">
+                <button id="generateShareButton" type="button">共有リンク生成</button>
+                <button id="copyShareButton" type="button" class="secondary-button" disabled>共有URLをコピー</button>
+              </div>
+            </div>
+
+            <label class="field">
+              <span>共有URL</span>
+              <textarea id="shareUrlOutput" rows="4" readonly placeholder="共有リンクを生成するとここに表示されます"></textarea>
+            </label>
+            <p id="shareWarning" class="muted-text"></p>
+          </section>
+        </main>
+      </div>
+
+      <div id="statusMessage" class="status-message is-info" aria-live="polite">
+        初期化中...
+      </div>
+    </div>
+
+    <script>
+      window.addEventListener('error', (event) => {
+        const target = document.querySelector('#statusMessage');
+        if (!target || !event?.message) {
+          return;
+        }
+        target.textContent = `初期化エラー: ${event.error?.stack || event.message}`;
+        target.className = 'status-message is-error';
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        const target = document.querySelector('#statusMessage');
+        if (!target) {
+          return;
+        }
+        const reason =
+          event?.reason?.stack || event?.reason?.message || String(event?.reason || '不明なエラー');
+        target.textContent = `初期化エラー: ${reason}`;
+        target.className = 'status-message is-error';
+      });
+    </script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
