@@ -17,12 +17,24 @@ function wrapSelection(textarea, before, after, fallbackText) {
 function prefixSelectionLines(textarea, prefix) {
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
-  const selection = textarea.value.slice(start, end) || '引用文';
-  const replaced = selection
+  const selected = textarea.value.slice(start, end) || '引用文';
+  const replaced = selected
     .split('\n')
     .map((line) => `${prefix}${line}`)
     .join('\n');
+
   replaceRange(textarea, replaced, start, end);
+}
+
+function wrapSelectionAsBlock(textarea, fence, fallbackText) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.slice(start, end).trim() || fallbackText;
+  const prefix = start > 0 && textarea.value[start - 1] !== '\n' ? '\n' : '';
+  const suffix = end < textarea.value.length && textarea.value[end] !== '\n' ? '\n' : '';
+  const block = `${prefix}${fence}\n${selected}\n${fence}${suffix}`;
+
+  replaceRange(textarea, block, start, end);
 }
 
 export function createEditorController({
@@ -65,7 +77,7 @@ export function createEditorController({
   function handleToolbar(command) {
     switch (command) {
       case 'bold':
-        wrapSelection(textarea, '**', '**', '強調テキスト');
+        wrapSelection(textarea, '**', '**', '太字テキスト');
         break;
       case 'italic':
         wrapSelection(textarea, '//', '//', '斜体テキスト');
@@ -86,6 +98,13 @@ export function createEditorController({
         break;
       case 'link':
         wrapSelection(textarea, '[[', '|https://example.com]]', 'リンク名');
+        break;
+      case 'codeblock':
+        wrapSelectionAsBlock(
+          textarea,
+          '```',
+          '[CLS-AUDIT] 20XX-11-07 11:44:03 JST\nFIELD=title\nOLD="sample"\nNEW=""',
+        );
         break;
       case 'image':
         onImageCommand?.();

@@ -63,6 +63,56 @@ function renderQuote(lines, attachmentMap) {
   return `<blockquote>${html}</blockquote>`;
 }
 
+function renderPreformatted(lines, className) {
+  return `<pre class="${escapeAttribute(className)}">${escapeHtml(lines.join('\n'))}</pre>`;
+}
+
+function getLogLineScore(line) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return 0;
+  }
+
+  let score = 0;
+
+  if (/^\[[A-Z0-9_-]+(?:\s+[A-Z0-9_-]+)*\]/.test(trimmed)) {
+    score += 2;
+  }
+
+  if (/^[A-Z][A-Z0-9_.-]*\s*=/.test(trimmed)) {
+    score += 2;
+  }
+
+  if (/^[A-Z][A-Z0-9_.-]*(?:\s+[A-Z0-9_.-]+){1,}$/.test(trimmed)) {
+    score += 1;
+  }
+
+  if (/".*"/.test(trimmed)) {
+    score += 1;
+  }
+
+  if (/(?:NOT FOUND|UNRESOLVED|DEGRADATION|MISMATCH|PURGED|EMPTY|RISK)/.test(trimmed.toUpperCase())) {
+    score += 1;
+  }
+
+  return score;
+}
+
+function isLikelyLogBlock(lines) {
+  const visibleLines = lines.filter((line) => line.trim());
+  if (visibleLines.length < 3) {
+    return false;
+  }
+
+  const totalScore = visibleLines.reduce((sum, line) => sum + getLogLineScore(line), 0);
+  const hasAuditHeader = visibleLines.some((line) =>
+    /^\[[A-Z0-9_-]+(?:\s+[A-Z0-9_-]+)*\]/.test(line.trim()),
+  );
+  const hasKeyValueLine = visibleLines.some((line) => /^[A-Z][A-Z0-9_.-]*\s*=/.test(line.trim()));
+
+  return totalScore >= visibleLines.length * 1.5 && (hasAuditHeader || hasKeyValueLine);
+}
+
 export function extractAttachmentReferences(content = '') {
   const ids = new Set();
   const pattern = /\[\[attachment:([a-z0-9_-]+)(?:\|[^\]]*)?\]\]/gi;
@@ -100,12 +150,22 @@ export function parseMarkupToHtml(content = '', attachments = []) {
   const blocks = [];
   const paragraph = [];
   const quote = [];
+  const codeBlock = [];
   const lines = normalizedContent.split('\n');
+  let inCodeBlock = false;
 
   const flushParagraph = () => {
-    if (paragraph.length) {
-      blocks.push(renderParagraph(paragraph.splice(0), attachmentMap));
+    if (!paragraph.length) {
+      return;
     }
+
+    const linesToRender = paragraph.splice(0);
+    if (isLikelyLogBlock(linesToRender)) {
+      blocks.push(renderPreformatted(linesToRender, 'log-block'));
+      return;
+    }
+
+    blocks.push(renderParagraph(linesToRender, attachmentMap));
   };
 
   const flushQuote = () => {
@@ -114,8 +174,35 @@ export function parseMarkupToHtml(content = '', attachments = []) {
     }
   };
 
+  const flushCodeBlock = () => {
+    if (!codeBlock.length) {
+      return;
+    }
+
+    blocks.push(renderPreformatted(codeBlock.splice(0), 'code-block'));
+  };
+
   for (const line of lines) {
     const trimmed = line.trim();
+
+    if (/^```/.test(trimmed)) {
+      flushParagraph();
+      flushQuote();
+
+      if (inCodeBlock) {
+        flushCodeBlock();
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlock.push(line);
+      continue;
+    }
 
     if (!trimmed) {
       flushParagraph();
@@ -163,6 +250,7 @@ export function parseMarkupToHtml(content = '', attachments = []) {
 
   flushParagraph();
   flushQuote();
+  flushCodeBlock();
 
   return blocks.join('\n');
 }

@@ -19,6 +19,7 @@ const ALLOWED_TAGS = new Set([
   'A',
   'BLOCKQUOTE',
   'BR',
+  'CODE',
   'DIV',
   'EM',
   'H1',
@@ -27,6 +28,7 @@ const ALLOWED_TAGS = new Set([
   'HR',
   'IMG',
   'P',
+  'PRE',
   'SPAN',
   'STRONG',
 ]);

@@ -112,6 +112,7 @@
               <button type="button" data-command="rule">水平線</button>
               <button type="button" data-command="quote">引用</button>
               <button type="button" data-command="link">リンク</button>
+              <button type="button" data-command="codeblock">Log</button>
               <button type="button" data-command="image">画像挿入</button>
             </div>
 
@@ -124,7 +125,7 @@
               id="articleContentInput"
               class="editor-textarea"
               rows="18"
-              placeholder="# 見出し&#10;&#10;本文を書く。&#10;**太字** や //斜体//、[[リンク名|https://example.com]]、[[attachment:ID|画像]] を使用できます。"
+              placeholder="# 見出し&#10;&#10;本文を書く。&#10;監査ログ風テキストはそのまま貼り付けても整形されます。&#10;必要なら ``` で囲んでログブロックにできます。"
             ></textarea>
 
             <div id="articlePreview" class="rendered-article preview-surface" hidden></div>
@@ -132,7 +133,8 @@
             <p class="muted-text">
               簡易記法: <code>#</code> / <code>##</code> / <code>###</code> 見出し、
               <code>**太字**</code>、<code>//斜体//</code>、<code>&gt; 引用</code>、
-              <code>---</code>、<code>[[表示名|URL]]</code>、<code>[[attachment:ID|代替文]]</code>
+              <code>---</code>、<code>[[表示名|URL]]</code>、<code>[[attachment:ID|代替文]]</code>、
+              <code>```</code> でログブロック。監査ログ風テキストは貼り付けだけでも自動整形されます。
             </p>
           </section>
 
