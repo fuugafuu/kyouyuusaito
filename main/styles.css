@@ -512,6 +512,26 @@ code {
   border-top: 1px solid rgba(0, 0, 0, 0.22);
 }
 
+.rendered-article details {
+  margin: 1rem 0;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 16px;
+  background: rgba(38, 31, 22, 0.05);
+  overflow: hidden;
+}
+
+.rendered-article summary {
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+  font-weight: 700;
+  user-select: none;
+  background: rgba(126, 47, 47, 0.08);
+}
+
+.rendered-article .collapsible-body {
+  padding: 0.2rem 1rem 1rem;
+}
+
 .rendered-article pre,
 .rendered-article code {
   font-family: "Consolas", "Courier New", monospace;

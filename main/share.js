@@ -220,7 +220,7 @@ export async function buildShareBundle({ profile, article, attachments, currentU
 
 export function buildShareUrl(token, currentUrl = window.location.href) {
   const sharePageUrl = new URL(buildViewerEntryUrl(currentUrl));
-  sharePageUrl.searchParams.set(SHARE_QUERY_KEY, token);
+  sharePageUrl.hash = `${SHARE_QUERY_KEY}=${token}`;
   return sharePageUrl.toString();
 }
 

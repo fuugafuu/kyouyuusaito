@@ -20,6 +20,7 @@ const ALLOWED_TAGS = new Set([
   'BLOCKQUOTE',
   'BR',
   'CODE',
+  'DETAILS',
   'DIV',
   'EM',
   'H1',
@@ -29,6 +30,7 @@ const ALLOWED_TAGS = new Set([
   'IMG',
   'P',
   'PRE',
+  'SUMMARY',
   'SPAN',
   'STRONG',
 ]);
@@ -36,6 +38,7 @@ const ALLOWED_TAGS = new Set([
 const ALLOWED_ATTRIBUTES = {
   '*': new Set(['class']),
   A: new Set(['href', 'target', 'rel', 'class']),
+  DETAILS: new Set(['open', 'class']),
   IMG: new Set(['src', 'alt', 'class', 'data-attachment-id']),
 };
 

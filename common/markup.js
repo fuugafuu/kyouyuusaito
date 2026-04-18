@@ -67,6 +67,30 @@ function renderPreformatted(lines, className) {
   return `<pre class="${escapeAttribute(className)}">${escapeHtml(lines.join('\n'))}</pre>`;
 }
 
+function renderCollapsibleBlock(title, content, attachments, { open = false } = {}) {
+  const safeTitle = escapeHtml(title || '折りたたみ');
+  const innerHtml = parseMarkupToHtml(content, attachments);
+  return `<details class="collapsible-block"${open ? ' open' : ''}><summary>${safeTitle}</summary><div class="collapsible-body">${innerHtml}</div></details>`;
+}
+
+function parseFoldDirective(line) {
+  const trimmed = String(line || '').trim();
+  const startMatch = trimmed.match(/^\[\[(fold|collapse)(-open)?:([^\]]+)\]\]$/i);
+  if (startMatch) {
+    return {
+      type: 'start',
+      open: Boolean(startMatch[2]),
+      title: startMatch[3].trim() || '折りたたみ',
+    };
+  }
+
+  if (/^\[\[\/(fold|collapse)\]\]$/i.test(trimmed)) {
+    return { type: 'end' };
+  }
+
+  return null;
+}
+
 function getLogLineScore(line) {
   const trimmed = line.trim();
   if (!trimmed) {
@@ -153,6 +177,7 @@ export function parseMarkupToHtml(content = '', attachments = []) {
   const codeBlock = [];
   const lines = normalizedContent.split('\n');
   let inCodeBlock = false;
+  let collapsibleBlock = null;
 
   const flushParagraph = () => {
     if (!paragraph.length) {
@@ -182,6 +207,22 @@ export function parseMarkupToHtml(content = '', attachments = []) {
     blocks.push(renderPreformatted(codeBlock.splice(0), 'code-block'));
   };
 
+  const flushCollapsibleBlock = () => {
+    if (!collapsibleBlock) {
+      return;
+    }
+
+    blocks.push(
+      renderCollapsibleBlock(
+        collapsibleBlock.title,
+        collapsibleBlock.lines.join('\n'),
+        attachments,
+        { open: collapsibleBlock.open },
+      ),
+    );
+    collapsibleBlock = null;
+  };
+
   for (const line of lines) {
     const trimmed = line.trim();
 
@@ -201,6 +242,27 @@ export function parseMarkupToHtml(content = '', attachments = []) {
 
     if (inCodeBlock) {
       codeBlock.push(line);
+      continue;
+    }
+
+    const foldDirective = parseFoldDirective(line);
+    if (collapsibleBlock) {
+      if (foldDirective?.type === 'end') {
+        flushCollapsibleBlock();
+      } else {
+        collapsibleBlock.lines.push(line);
+      }
+      continue;
+    }
+
+    if (foldDirective?.type === 'start') {
+      flushParagraph();
+      flushQuote();
+      collapsibleBlock = {
+        title: foldDirective.title,
+        open: foldDirective.open,
+        lines: [],
+      };
       continue;
     }
 
@@ -251,6 +313,7 @@ export function parseMarkupToHtml(content = '', attachments = []) {
   flushParagraph();
   flushQuote();
   flushCodeBlock();
+  flushCollapsibleBlock();
 
   return blocks.join('\n');
 }
