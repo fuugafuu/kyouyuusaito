@@ -4,12 +4,15 @@
     <loc>https://kyouyuusaito.vercel.app/</loc>
   </url>
   <url>
-    <loc>https://kyouyuusaito.vercel.app/p/scp-002</loc>
+    <loc>https://kyouyuusaito.vercel.app/main</loc>
   </url>
   <url>
-    <loc>https://kyouyuusaito.vercel.app/p/scp-017</loc>
+    <loc>https://kyouyuusaito.vercel.app/share</loc>
   </url>
   <url>
-    <loc>https://kyouyuusaito.vercel.app/p/scp-093</loc>
+    <loc>https://kyouyuusaito.vercel.app/public</loc>
+  </url>
+  <url>
+    <loc>https://kyouyuusaito.vercel.app/admin</loc>
   </url>
 </urlset>
