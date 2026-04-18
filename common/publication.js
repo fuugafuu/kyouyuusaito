@@ -2,8 +2,6 @@ import {
   APP_VERSION,
   DEFAULT_ARTICLE_SERIES,
   DEFAULT_PROFILE_NAME,
-  PUBLIC_QUERY_KEY,
-  PUBLIC_SLUG_KEY,
   PUBLIC_URL_DANGER_LENGTH,
   PUBLIC_URL_WARN_LENGTH,
   SHARE_ICON_MAX_DIMENSION,
@@ -14,6 +12,7 @@ import {
 import { encodeSharePayloadToken } from './share-codec.js';
 import { extractAttachmentReferences } from './markup.js';
 import { normalizePublicPayload } from './models.js';
+import { buildPublicArticleUrl, getPublicHomeUrl } from './routes.js';
 import { estimateDataUrlBytes, resizeImageDataUrl, slugify, splitDataUrl } from './utils.js';
 
 const PUBLIC_IMAGE_PRESETS = [
@@ -71,20 +70,21 @@ export function buildArticleSlug(article = {}) {
 }
 
 export function buildPublicEntryUrl(currentUrl = window.location.href) {
-  const current = new URL(currentUrl, window.location.origin);
-  return new URL('/public', current.origin).toString();
+  return getPublicHomeUrl(currentUrl);
 }
 
-export function buildPublicUrlFromToken(token, currentUrl = window.location.href) {
-  const publicUrl = new URL(buildPublicEntryUrl(currentUrl));
-  publicUrl.hash = `${PUBLIC_QUERY_KEY}=${token}`;
-  return publicUrl.toString();
+export function buildPublicUrlFromToken(token, article, currentUrl = window.location.href) {
+  const slug = buildArticleSlug(article);
+  return buildPublicArticleUrl(slug, {
+    token,
+    currentUrl,
+  });
 }
 
 export function buildLocalPublicSlugUrl(slug, currentUrl = window.location.href) {
-  const publicUrl = new URL(buildPublicEntryUrl(currentUrl));
-  publicUrl.hash = `${PUBLIC_SLUG_KEY}=${encodeURIComponent(slug)}`;
-  return publicUrl.toString();
+  return buildPublicArticleUrl(slug, {
+    currentUrl,
+  });
 }
 
 async function optimizeImage(dataUrl, { maxDimension, quality }) {
@@ -204,7 +204,7 @@ async function createPublicCandidate({
   });
 
   const token = encodeSharePayloadToken(payload);
-  const url = buildPublicUrlFromToken(token, currentUrl);
+  const url = buildPublicUrlFromToken(token, payload.article, currentUrl);
   const slugUrl = buildLocalPublicSlugUrl(payload.article.slug, currentUrl);
 
   return {
@@ -260,13 +260,13 @@ export async function buildPublicBundle({
 
 export function getPublicWarnings(bundle) {
   const warnings = [];
-  if (!bundle?.url) {
+  if (!bundle?.url && !bundle?.slugUrl) {
     return warnings;
   }
 
-  if (bundle.metrics?.urlLength > PUBLIC_URL_DANGER_LENGTH) {
+  if (!bundle?.slugUrl && bundle.metrics?.urlLength > PUBLIC_URL_DANGER_LENGTH) {
     warnings.push('公開URLが非常に長いため、一部のSNSやスマホでは開けない可能性があります。公開ファイルや公開コードの併用をおすすめします。');
-  } else if (bundle.metrics?.urlLength > PUBLIC_URL_WARN_LENGTH) {
+  } else if (!bundle?.slugUrl && bundle.metrics?.urlLength > PUBLIC_URL_WARN_LENGTH) {
     warnings.push('公開URLが長めです。LINEや一部ブラウザでは途中で切れる場合があります。');
   }
 
