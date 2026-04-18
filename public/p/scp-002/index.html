@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sandwich Box Archive</title>
+    <meta name="description" content="短いURLで見やすく開けるSCP風アーカイブ。公開一覧を別端末からも素早く閲覧できます。">
+    <link rel="stylesheet" href="/public-site/styles.css">
+  </head>
+  <body data-status-target="#publicStatus">
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="site-brand">
+          <div class="site-mark" aria-hidden="true"></div>
+          <div>
+            <p class="site-kicker">Sandwich Box / Public Archive</p>
+            <h1 id="publicTitle">Sandwich Box Archive</h1>
+            <p id="publicStatus" class="public-status is-info">公開一覧を読み込み中です。</p>
+          </div>
+        </div>
+
+        <div class="site-tools">
+          <a href="/">ホーム</a>
+          <a href="/s">共有ビューア</a>
+          <a href="/studio">制作スタジオ</a>
+        </div>
+      </header>
+
+      <nav class="site-nav">
+        <a href="/">SCPシリーズ</a>
+        <a href="#archive-panel">アーカイブ一覧</a>
+        <a href="#import-panel">共有コード読込</a>
+      </nav>
+
+      <div class="site-layout">
+        <aside class="sidebar-stack">
+          <section class="sidebar-box sidebar-box-accent">
+            <h2>新しい公開サイト</h2>
+            <ul>
+              <li>短い `/p/slug` URL</li>
+              <li>一覧を別端末でも閲覧可能</li>
+              <li>スマホでは縦一列で表示</li>
+              <li>管理画面は公開面から分離</li>
+            </ul>
+          </section>
+
+          <section class="sidebar-box" id="archive-panel">
+            <h2>公開一覧</h2>
+            <p id="publicArchiveHint" class="muted-text">公開済み記事を一覧からすぐ開けます。</p>
+            <div id="publicArchiveList" class="archive-list"></div>
+          </section>
+
+          <section class="sidebar-box" id="import-panel">
+            <h2>共有コード読込</h2>
+            <label class="field">
+              <span>共有URL / 共有コード</span>
+              <textarea
+                id="publicImportInput"
+                rows="8"
+                placeholder="共有URL、共有コード、公開URLのどれでも貼り付けできます。"
+              ></textarea>
+            </label>
+
+            <div class="button-grid">
+              <button id="publicLoadButton" type="button">読み込む</button>
+              <button id="publicPasteButton" type="button" class="secondary-button">貼り付け</button>
+              <label class="file-button">
+                ファイル
+                <input id="publicFileInput" type="file" accept=".scp-public,.scp-share,text/plain">
+              </label>
+              <button id="publicClearButton" type="button" class="secondary-button">クリア</button>
+            </div>
+
+            <p id="publicEntryUrl" class="muted-text mono-note"></p>
+          </section>
+        </aside>
+
+        <main class="content-panel">
+          <section class="article-head">
+            <div>
+              <p class="section-label">Designation</p>
+              <h2 id="publicDesignation">SCP Archive</h2>
+            </div>
+
+            <div class="meta-pills">
+              <span id="publicObjectClass" class="meta-pill">Object Class: Public</span>
+              <span id="publicSource" class="meta-pill">Source: Archive</span>
+              <span id="publicAuthor" class="meta-pill">Author: Sandwich Box</span>
+            </div>
+          </section>
+
+          <p id="publicSummary" class="article-summary">公開記事の概要がここに表示されます。</p>
+
+          <section class="article-frame-panel">
+            <iframe id="publicArticleFrame" class="public-frame" title="公開記事"></iframe>
+          </section>
+
+          <section class="attachment-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Attachments</p>
+                <h2>添付画像</h2>
+              </div>
+            </div>
+            <div id="publicAttachmentList" class="attachment-grid"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/common/boot.js"></script>
+    <script type="module" src="/public-site/app.js"></script>
+  </body>
+</html>
