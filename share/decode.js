@@ -7,7 +7,17 @@ const DIRECT_TOKEN_PATTERN = /\b(?:raw|lzw)\.[A-Za-z0-9_-]+\b/;
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/gi;
 
 function normalizeUrlCandidate(value) {
-  return String(value || '').replace(/[),.!?」』]+$/g, '');
+  return String(value || '').replace(/[),.!?、。]+$/g, '');
+}
+
+function normalizeImportText(value) {
+  return String(value || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
+
+function collapseWhitespace(value) {
+  return normalizeImportText(value).replace(/\s+/g, '');
 }
 
 function assertSharePayloadShape(payload) {
@@ -40,14 +50,16 @@ function decodeLegacyPayload(encoded) {
 }
 
 export function extractShareTokenFromText(text) {
-  const source = String(text || '').trim();
+  const source = normalizeImportText(text);
   if (!source) {
     return '';
   }
 
-  if (/^https?:\/\//i.test(source)) {
+  const collapsedSource = collapseWhitespace(source);
+
+  if (/^https?:\/\//i.test(source) || /^https?:\/\//i.test(collapsedSource)) {
     try {
-      const parsed = new URL(normalizeUrlCandidate(source));
+      const parsed = new URL(normalizeUrlCandidate(/^https?:\/\//i.test(source) ? source : collapsedSource));
       return (
         parsed.searchParams.get(SHARE_QUERY_KEY) ||
         readHashParam(SHARE_QUERY_KEY, parsed.hash) ||
@@ -59,29 +71,43 @@ export function extractShareTokenFromText(text) {
     }
   }
 
-  const directTokenMatch = source.match(DIRECT_TOKEN_PATTERN);
+  const directTokenMatch = source.match(DIRECT_TOKEN_PATTERN) || collapsedSource.match(DIRECT_TOKEN_PATTERN);
   if (directTokenMatch) {
     return directTokenMatch[0];
   }
 
-  for (const match of source.matchAll(URL_PATTERN)) {
-    try {
-      const parsed = new URL(normalizeUrlCandidate(match[0]));
-      const token =
-        parsed.searchParams.get(SHARE_QUERY_KEY) ||
-        readHashParam(SHARE_QUERY_KEY, parsed.hash) ||
-        readHashParam(SHARE_HASH_KEY, parsed.hash) ||
-        '';
+  for (const candidateSource of [source, collapsedSource]) {
+    for (const match of candidateSource.matchAll(URL_PATTERN)) {
+      try {
+        const parsed = new URL(normalizeUrlCandidate(match[0]));
+        const token =
+          parsed.searchParams.get(SHARE_QUERY_KEY) ||
+          readHashParam(SHARE_QUERY_KEY, parsed.hash) ||
+          readHashParam(SHARE_HASH_KEY, parsed.hash) ||
+          '';
 
-      if (token) {
-        return token;
+        if (token) {
+          return token;
+        }
+      } catch {
+        continue;
       }
-    } catch {
-      continue;
     }
   }
 
-  return source;
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => collapseWhitespace(line))
+    .filter(Boolean);
+
+  for (const line of lines) {
+    const token = line.match(DIRECT_TOKEN_PATTERN)?.[0] || '';
+    if (token) {
+      return token;
+    }
+  }
+
+  return /^[A-Za-z0-9+/=_-]+$/.test(collapsedSource) ? collapsedSource : '';
 }
 
 export function decodeSharePayloadFromText(text) {
