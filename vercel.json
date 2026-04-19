@@ -34,7 +34,7 @@
     },
     {
       "source": "/p/:path*",
-      "destination": "/public-site/index"
+      "destination": "/archive/index"
     },
     {
       "source": "/clearance-7f3d9q",
@@ -46,7 +46,7 @@
     },
     {
       "source": "/",
-      "destination": "/public-site/index"
+      "destination": "/archive/index"
     }
   ],
   "headers": [
@@ -108,7 +108,7 @@
       ]
     },
     {
-      "source": "/public-site",
+      "source": "/archive",
       "headers": [
         {
           "key": "X-Robots-Tag",
