@@ -72,14 +72,6 @@ function createBitReader(bytes) {
   };
 }
 
-function bytesToBinaryString(bytes) {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return binary;
-}
-
 function binaryStringToBytes(binary) {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
@@ -132,6 +124,10 @@ function lzwCompressBytes(bytes) {
 }
 
 function lzwDecompressBytes(bytes) {
+  if (!(bytes instanceof Uint8Array) || !bytes.length) {
+    return new Uint8Array();
+  }
+
   const dictionary = Array.from({ length: INITIAL_NEXT_CODE }, (_, index) =>
     index < 256 ? String.fromCharCode(index) : '',
   );
@@ -143,6 +139,10 @@ function lzwDecompressBytes(bytes) {
 
   if (firstCode === null || firstCode === EOF_CODE) {
     return new Uint8Array();
+  }
+
+  if (firstCode < 0 || firstCode >= 256) {
+    throw new Error('共有データの先頭コードが壊れています。');
   }
 
   let previous = dictionary[firstCode];
@@ -297,12 +297,31 @@ export function decodeSharePayloadToken(token) {
 
   let json = '';
   if (normalized.startsWith(LZW_PREFIX)) {
-    json = decodeUtf8Bytes(lzwDecompressBytes(base64UrlToBytes(normalized.slice(LZW_PREFIX.length))));
+    try {
+      json = decodeUtf8Bytes(lzwDecompressBytes(base64UrlToBytes(normalized.slice(LZW_PREFIX.length))));
+    } catch (error) {
+      throw new Error(
+        error instanceof Error && error.message
+          ? `共有データの復元に失敗しました: ${error.message}`
+          : '共有データの復元に失敗しました。',
+      );
+    }
   } else if (normalized.startsWith(RAW_PREFIX)) {
-    json = decodeUtf8Bytes(base64UrlToBytes(normalized.slice(RAW_PREFIX.length)));
+    try {
+      json = decodeUtf8Bytes(base64UrlToBytes(normalized.slice(RAW_PREFIX.length)));
+    } catch {
+      throw new Error('共有データの読み取りに失敗しました。');
+    }
   } else {
     throw new Error('共有コードの形式が正しくありません。');
   }
 
-  return unpackPayload(JSON.parse(json));
+  try {
+    return unpackPayload(JSON.parse(json));
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error('共有データの JSON が壊れています。');
+    }
+    throw error;
+  }
 }
