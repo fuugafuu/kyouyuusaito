@@ -1,0 +1,62 @@
+{
+  "updatedAt": "2026-04-19T00:00:00.000Z",
+  "siteTitle": "Sandwich Box Archive",
+  "articles": [
+    {
+      "slug": "scp-002",
+      "title": "Living Room",
+      "designation": "SCP-002",
+      "series": "SCP",
+      "articleNumber": 2,
+      "objectClass": "Euclid",
+      "ratingUp": 204,
+      "ratingDown": 12,
+      "ratingScore": 192,
+      "summary": "Sample article for validating short public URLs, archive browsing, and mobile-safe layout.",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": true
+    },
+    {
+      "slug": "scp-017",
+      "title": "Shadow Person",
+      "designation": "SCP-017",
+      "series": "SCP",
+      "articleNumber": 17,
+      "objectClass": "Keter",
+      "ratingUp": 128,
+      "ratingDown": 28,
+      "ratingScore": 100,
+      "summary": "Sample article for checking both shared-code loading and public archive access.",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": false
+    },
+    {
+      "slug": "scp-093",
+      "title": "Red Sea Object",
+      "designation": "SCP-093",
+      "series": "SCP",
+      "articleNumber": 93,
+      "objectClass": "Euclid",
+      "ratingUp": 84,
+      "ratingDown": 9,
+      "ratingScore": 75,
+      "summary": "Sample article for attachment rendering and direct access from the public list.",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": false
+    },
+    {
+      "slug": "scp-jp-001",
+      "title": "Kage Test",
+      "designation": "SCP-JP-001",
+      "series": "SCP-JP",
+      "articleNumber": 1,
+      "objectClass": "Safe",
+      "ratingUp": 32,
+      "ratingDown": 4,
+      "ratingScore": 28,
+      "summary": "Sample SCP-JP article for verifying that Japanese series slots are separated from the main SCP list.",
+      "publishedAt": "2026-04-18T00:00:00.000Z",
+      "featured": false
+    }
+  ]
+}
