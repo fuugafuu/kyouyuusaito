@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "profile": {
+    "name": "Site Archive",
+    "icon": ""
+  },
+  "article": {
+    "title": "Kage Test",
+    "content": "++ Special Containment Procedures\n\nSCP-JP-001 is a sample Japanese-series article used to verify separated numbering and public loading.\n\n++ Description\n\nThis entry exists so the SCP-JP list can have its own 001-10000 range independent from SCP.\n",
+    "series": "SCP-JP",
+    "articleNumber": 1,
+    "objectClass": "Safe",
+    "slug": "scp-jp-001",
+    "summary": "Sample SCP-JP article used to validate separated numbering and public access.",
+    "customCss": "",
+    "customJs": "",
+    "publishedAt": 1776460800000,
+    "updatedAt": 1776460800000,
+    "ratingUp": 32,
+    "ratingDown": 4,
+    "ratingScore": 28,
+    "ratingUpdatedAt": 1776460800000
+  },
+  "attachments": []
+}
