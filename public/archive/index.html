@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sandwich Box Archive</title>
+    <meta
+      name="description"
+      content="公開された SCP 図鑑を短いURLで一覧・閲覧できる公開アーカイブ。スマホでも見やすく、検索エンジンにも載りやすい構成です。"
+    >
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Sandwich Box Archive">
+    <meta property="og:title" content="Sandwich Box Archive">
+    <meta
+      property="og:description"
+      content="公開された SCP 図鑑を短いURLで一覧・閲覧できる公開アーカイブ。スマホでも見やすく、検索エンジンにも載りやすい構成です。"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/archive/styles.css">
+  </head>
+  <body data-status-target="#publicStatus">
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="site-brand">
+          <div class="site-mark" aria-hidden="true"></div>
+          <div>
+            <p class="site-kicker">Sandwich Box / SCP Public Archive</p>
+            <h1 id="publicTitle">Sandwich Box Archive</h1>
+            <p id="publicStatus" class="public-status is-info">公開された記事を読み込み中です。</p>
+          </div>
+        </div>
+
+        <div class="site-tools">
+          <a href="/">ホーム</a>
+          <a href="/s">共有ビューア</a>
+          <a href="/studio">制作スタジオ</a>
+        </div>
+      </header>
+
+      <nav class="site-nav">
+        <a href="#catalog-panel">一覧</a>
+        <a href="#slot-panel">001-10000</a>
+        <a href="#import-panel">共有コード読込</a>
+      </nav>
+
+      <div class="site-layout">
+        <aside class="sidebar-stack">
+          <section class="sidebar-box sidebar-box-accent">
+            <h2>公開ガイド</h2>
+            <ul>
+              <li>公開記事は `/p/slug` の短い URL で閲覧できます。</li>
+              <li>001 から 10000 までの番号を軽い表示で探せます。</li>
+              <li>スマホでは縦並びに切り替わり、一覧も押しやすくなります。</li>
+              <li>管理画面と共有ビューアは検索対象から外しています。</li>
+            </ul>
+          </section>
+
+          <section class="sidebar-box" id="catalog-panel">
+            <h2>公開一覧</h2>
+            <div id="publicArchiveStats" class="stats-stack"></div>
+          </section>
+
+          <section class="sidebar-box" id="slot-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Range Browser</p>
+                <h2>001-10000</h2>
+              </div>
+            </div>
+            <section class="series-panel">
+              <h3>SCP</h3>
+              <div id="publicRangeListScp" class="range-grid"></div>
+              <div id="publicSlotListScp" class="slot-grid"></div>
+            </section>
+            <section class="series-panel">
+              <h3>SCP-JP</h3>
+              <div id="publicRangeListJp" class="range-grid"></div>
+              <div id="publicSlotListJp" class="slot-grid"></div>
+            </section>
+          </section>
+
+          <section class="sidebar-box" id="import-panel">
+            <h2>共有コード読込</h2>
+            <label class="field">
+              <span>共有 URL / 共有コード</span>
+              <textarea
+                id="publicImportInput"
+                rows="8"
+                placeholder="共有URL、共有コード、または公開URLを貼り付けて読み込めます。"
+              ></textarea>
+            </label>
+
+            <div class="button-grid">
+              <button id="publicLoadButton" type="button">読み込む</button>
+              <button id="publicPasteButton" type="button" class="secondary-button">貼り付け</button>
+              <label class="file-button">
+                ファイル
+                <input id="publicFileInput" type="file" accept=".scp-public,.scp-share,text/plain">
+              </label>
+              <button id="publicClearButton" type="button" class="secondary-button">クリア</button>
+            </div>
+
+            <p id="publicEntryUrl" class="muted-text mono-note"></p>
+          </section>
+        </aside>
+
+        <main class="content-panel">
+          <section class="article-head">
+            <div>
+              <p class="section-label">Designation</p>
+              <h2 id="publicDesignation">SCP Archive</h2>
+            </div>
+
+            <div class="meta-pills">
+              <span id="publicObjectClass" class="meta-pill">Object Class: Public</span>
+              <span id="publicSource" class="meta-pill">Source: Archive</span>
+              <span id="publicAuthor" class="meta-pill">Author: Sandwich Box</span>
+            </div>
+          </section>
+
+          <p id="publicSummary" class="article-summary">公開記事の要約がここに表示されます。</p>
+
+          <section class="rating-panel">
+            <div>
+              <p class="section-label">Rating</p>
+              <div id="publicRatingScore" class="rating-score">評価 +0</div>
+              <p id="publicRatingMeta" class="muted-text">賛成 0 / 反対 0</p>
+            </div>
+            <div class="button-grid rating-actions">
+              <button id="publicVoteUpButton" type="button">+ 評価する</button>
+              <button id="publicVoteDownButton" type="button" class="secondary-button">- 評価する</button>
+            </div>
+          </section>
+
+          <section class="article-frame-panel">
+            <iframe id="publicArticleFrame" class="public-frame" title="公開記事ビュー"></iframe>
+          </section>
+
+          <section class="attachment-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Attachments</p>
+                <h2>添付画像</h2>
+              </div>
+            </div>
+            <div id="publicAttachmentList" class="attachment-grid"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/common/runtime.js"></script>
+    <script type="module" src="/archive/app.js"></script>
+  </body>
+</html>
