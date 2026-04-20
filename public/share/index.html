@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCP Shared Viewer</title>
+    <title>Sandwich Box Share Viewer</title>
     <meta
       name="description"
-      content="SCP Sandbox Editor で生成した共有URL、共有コード、共有ファイルを読み込む閲覧専用ビューア。"
+      content="Sandwich Box の共有URL、公開URL、共有コードを確認できる読み取り専用ビューアです。"
     >
+    <meta name="robots" content="noindex, nofollow, noarchive">
     <link rel="stylesheet" href="/share/styles.css">
   </head>
-  <body>
+  <body data-status-target="#viewerStatus">
     <div class="viewer-backdrop"></div>
 
     <div class="viewer-shell">
@@ -19,12 +20,12 @@
           <p class="eyebrow">Shared Viewer / Read Only</p>
           <h1 id="viewerArticleTitle">共有ビューア</h1>
           <p id="viewerStatus" class="viewer-status is-info">
-            共有URL、共有コード、共有ファイルのいずれかを読み込むと閲覧専用の記事が表示されます。
+            共有URL、公開URL、共有コード、共有ファイルのいずれかを読み込むと本文が表示されます。
           </p>
         </div>
 
         <div class="viewer-header-actions">
-          <a class="viewer-link-button" href="/main">Editor へ戻る</a>
+          <a class="viewer-link-button" href="/studio">Studio へ戻る</a>
           <button id="viewerResetButton" type="button" class="secondary-button">初期状態へ戻す</button>
         </div>
       </header>
@@ -40,26 +41,26 @@
             </div>
 
             <label class="field">
-              <span>共有URL / 共有コード / 共有パッケージ</span>
+              <span>共有URL / 公開URL / 共有コード / 共有パッケージ</span>
               <textarea
                 id="viewerImportInput"
                 rows="8"
-                placeholder="ここに共有URL、共有コード、または共有パッケージ全文を貼り付けます。"
+                placeholder="ここに共有URL、公開URL、共有コード、または共有パッケージ全文を貼り付けてください。"
               ></textarea>
             </label>
 
             <div class="button-grid">
               <button id="viewerLoadButton" type="button">読み込む</button>
-              <button id="viewerPasteButton" type="button" class="secondary-button">クリップボードを貼り付け</button>
+              <button id="viewerPasteButton" type="button" class="secondary-button">貼り付け</button>
               <label class="file-button">
-                共有ファイルを読む
-                <input id="viewerFileInput" type="file" accept=".scp-share,text/plain">
+                共有ファイル
+                <input id="viewerFileInput" type="file" accept=".scp-share,.scp-public,text/plain">
               </label>
               <button id="viewerClearButton" type="button" class="secondary-button">入力を消す</button>
             </div>
 
             <div class="viewer-tips">
-              <p>URL が長すぎて LINE やスマホで崩れる場合は、共有コードや共有ファイルが安定します。</p>
+              <p>URLのままでも、コード全文でも、ファイルでも読み込めます。</p>
               <p id="viewerEntryUrl" class="mono-note"></p>
             </div>
           </section>
@@ -69,8 +70,8 @@
               <img id="viewerProfileIcon" class="viewer-profile-icon" alt="共有者アイコン">
               <div>
                 <p class="eyebrow compact">Profile</p>
-                <h2 id="viewerProfileName">匿名職員</h2>
-                <p class="muted-text">共有記事のプロフィール表示です。</p>
+                <h2 id="viewerProfileName">共有者名</h2>
+                <p class="muted-text">共有者プロフィールの表示領域です。</p>
               </div>
             </div>
 
@@ -92,18 +93,18 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow compact">Recovered Payload</p>
-                <h2>共有の状態</h2>
+                <h2>共有データの状態</h2>
               </div>
               <span id="viewerSourceLabel" class="viewer-pill">No Data</span>
             </div>
             <p id="viewerSummary" class="muted-text">
-              共有データが読み込まれると、本文と添付画像がここに表示されます。
+              共有データが読み込まれると、本文と添付情報がここに表示されます。
             </p>
           </section>
 
           <article id="viewerArticleContent" class="viewer-paper rendered-article">
             <p class="empty-preview">
-              共有データを読み込むと本文がここに表示されます。危険な HTML はサニタイズしてから描画します。
+              共有データを読み込むと本文がここに表示されます。危険なHTMLはサニタイズされてから表示されます。
             </p>
           </article>
 
@@ -120,27 +121,7 @@
       </section>
     </div>
 
-    <script>
-      window.addEventListener('error', (event) => {
-        const target = document.querySelector('#viewerStatus');
-        if (!target || !event?.message) {
-          return;
-        }
-        target.textContent = `共有ビューアエラー: ${event.error?.stack || event.message}`;
-        target.className = 'viewer-status is-error';
-      });
-
-      window.addEventListener('unhandledrejection', (event) => {
-        const target = document.querySelector('#viewerStatus');
-        if (!target) {
-          return;
-        }
-        const reason =
-          event?.reason?.stack || event?.reason?.message || String(event?.reason || 'Unknown error');
-        target.textContent = `共有ビューアエラー: ${reason}`;
-        target.className = 'viewer-status is-error';
-      });
-    </script>
+    <script type="module" src="/common/boot.js"></script>
     <script type="module" src="/share/viewer.js"></script>
   </body>
 </html>
