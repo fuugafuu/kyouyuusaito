@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "profile": {
+    "name": "Site Archive",
+    "icon": ""
+  },
+  "article": {
+    "title": "光喰いの影",
+    "content": "++ 特別収容プロトコル\n\nSCP-017 は完全暗室に収容されます。観察は遠隔カメラ越しにのみ行われます。\n\n++ 説明\n\nSCP-017 は影のように見える二次元存在であり、強い光を避けて移動します。本記事は一覧画面の複数件表示やモバイルスクロール量の確認を目的としたサンプルです。\n",
+    "series": "SCP",
+    "articleNumber": 17,
+    "objectClass": "Keter",
+    "slug": "scp-017",
+    "summary": "暗所で活性化する影状存在。短い公開URLの確認用サンプル。",
+    "customCss": "",
+    "customJs": "",
+    "publishedAt": 1776460800000,
+    "updatedAt": 1776460800000
+  },
+  "attachments": []
+}
