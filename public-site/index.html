@@ -6,7 +6,7 @@
     <title>Sandwich Box Archive</title>
     <meta
       name="description"
-      content="短いURLで見やすく開けるSCP風アーカイブ。公開一覧を別端末からも素早く閲覧できます。"
+      content="公開された SCP 図鑑を短いURLで一覧・閲覧できる公開アーカイブ。スマホでも見やすく、検索エンジンにも載りやすい構成です。"
     >
     <meta name="robots" content="index, follow, max-image-preview:large">
     <meta property="og:type" content="website">
@@ -14,11 +14,11 @@
     <meta property="og:title" content="Sandwich Box Archive">
     <meta
       property="og:description"
-      content="短いURLで見やすく開けるSCP風アーカイブ。公開一覧を別端末からも素早く閲覧できます。"
+      content="公開された SCP 図鑑を短いURLで一覧・閲覧できる公開アーカイブ。スマホでも見やすく、検索エンジンにも載りやすい構成です。"
     >
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/public-site/styles.css">
+    <link rel="stylesheet" href="/archive/styles.css">
   </head>
   <body data-status-target="#publicStatus">
     <div class="site-shell">
@@ -26,9 +26,9 @@
         <div class="site-brand">
           <div class="site-mark" aria-hidden="true"></div>
           <div>
-            <p class="site-kicker">Sandwich Box / Public Archive</p>
+            <p class="site-kicker">Sandwich Box / SCP Public Archive</p>
             <h1 id="publicTitle">Sandwich Box Archive</h1>
-            <p id="publicStatus" class="public-status is-info">公開一覧を読み込み中です。</p>
+            <p id="publicStatus" class="public-status is-info">公開された記事を読み込み中です。</p>
           </div>
         </div>
 
@@ -40,37 +40,55 @@
       </header>
 
       <nav class="site-nav">
-        <a href="/">SCPシリーズ</a>
-        <a href="#archive-panel">アーカイブ一覧</a>
+        <a href="#catalog-panel">一覧</a>
+        <a href="#slot-panel">001-10000</a>
         <a href="#import-panel">共有コード読込</a>
       </nav>
 
       <div class="site-layout">
         <aside class="sidebar-stack">
           <section class="sidebar-box sidebar-box-accent">
-            <h2>新しい公開サイト</h2>
+            <h2>公開ガイド</h2>
             <ul>
-              <li>短い `/p/slug` URL</li>
-              <li>一覧を別端末でも閲覧可能</li>
-              <li>スマホでは縦一列で表示</li>
-              <li>管理画面は公開面から分離</li>
+              <li>公開記事は `/p/slug` の短い URL で閲覧できます。</li>
+              <li>001 から 10000 までの番号を軽い表示で探せます。</li>
+              <li>スマホでは縦並びに切り替わり、一覧も押しやすくなります。</li>
+              <li>管理画面と共有ビューアは検索対象から外しています。</li>
             </ul>
           </section>
 
-          <section class="sidebar-box" id="archive-panel">
+          <section class="sidebar-box" id="catalog-panel">
             <h2>公開一覧</h2>
-            <p id="publicArchiveHint" class="muted-text">公開済み記事を一覧からすぐ開けます。</p>
-            <div id="publicArchiveList" class="archive-list"></div>
+            <div id="publicArchiveStats" class="stats-stack"></div>
+          </section>
+
+          <section class="sidebar-box" id="slot-panel">
+            <div class="section-heading">
+              <div>
+                <p class="section-label">Range Browser</p>
+                <h2>001-10000</h2>
+              </div>
+            </div>
+            <section class="series-panel">
+              <h3>SCP</h3>
+              <div id="publicRangeListScp" class="range-grid"></div>
+              <div id="publicSlotListScp" class="slot-grid"></div>
+            </section>
+            <section class="series-panel">
+              <h3>SCP-JP</h3>
+              <div id="publicRangeListJp" class="range-grid"></div>
+              <div id="publicSlotListJp" class="slot-grid"></div>
+            </section>
           </section>
 
           <section class="sidebar-box" id="import-panel">
             <h2>共有コード読込</h2>
             <label class="field">
-              <span>共有URL / 共有コード</span>
+              <span>共有 URL / 共有コード</span>
               <textarea
                 id="publicImportInput"
                 rows="8"
-                placeholder="共有URL、共有コード、公開URLのどれでも貼り付けできます。"
+                placeholder="共有URL、共有コード、または公開URLを貼り付けて読み込めます。"
               ></textarea>
             </label>
 
@@ -102,10 +120,22 @@
             </div>
           </section>
 
-          <p id="publicSummary" class="article-summary">公開記事の概要がここに表示されます。</p>
+          <p id="publicSummary" class="article-summary">公開記事の要約がここに表示されます。</p>
+
+          <section class="rating-panel">
+            <div>
+              <p class="section-label">Rating</p>
+              <div id="publicRatingScore" class="rating-score">評価 +0</div>
+              <p id="publicRatingMeta" class="muted-text">賛成 0 / 反対 0</p>
+            </div>
+            <div class="button-grid rating-actions">
+              <button id="publicVoteUpButton" type="button">+ 評価する</button>
+              <button id="publicVoteDownButton" type="button" class="secondary-button">- 評価する</button>
+            </div>
+          </section>
 
           <section class="article-frame-panel">
-            <iframe id="publicArticleFrame" class="public-frame" title="公開記事"></iframe>
+            <iframe id="publicArticleFrame" class="public-frame" title="公開記事ビュー"></iframe>
           </section>
 
           <section class="attachment-panel">
@@ -121,7 +151,7 @@
       </div>
     </div>
 
-    <script type="module" src="/common/boot.js"></script>
+    <script type="module" src="/common/runtime.js"></script>
     <script type="module" src="/public-site/app.js"></script>
   </body>
 </html>
