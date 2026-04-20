@@ -1,7 +1,14 @@
 import { DEFAULT_PROFILE_NAME } from '../common/constants.js';
 import { parseMarkupToHtml } from '../common/markup.js';
 import { normalizePublicPayload } from '../common/models.js';
-import { buildArticleDesignation, buildArticleSlug } from '../common/publication.js';
+import {
+  buildArticleDesignation,
+  buildArticleSlug,
+  buildCatalogRangeSummary,
+  createCatalogRanges,
+  formatArticleSlot,
+  getArticleRatingSnapshot,
+} from '../common/publication.js';
 import { buildPublicArticlePath, buildPublicArticleUrl, getPublicHomeUrl } from '../common/routes.js';
 import { mountSandboxedArticleFrame } from '../common/render-frame.js';
 import { readClipboardText, readTextFile, safeParseJSON } from '../common/utils.js';
@@ -13,8 +20,10 @@ import {
 } from './decode.js';
 
 const PUBLIC_TOKEN_CACHE_KEY = 'scpSandboxPublicTokenCache';
+const PUBLIC_VOTE_CACHE_KEY = 'scpSandboxPublicVotes';
 const MAX_CACHED_TOKENS = 12;
 const LIBRARY_URL = '/data/library.json';
+const RANGE_SIZE = 100;
 
 const refs = {
   status: document.querySelector('#publicStatus'),
@@ -24,19 +33,39 @@ const refs = {
   author: document.querySelector('#publicAuthor'),
   source: document.querySelector('#publicSource'),
   summary: document.querySelector('#publicSummary'),
+  archiveStats: document.querySelector('#publicArchiveStats'),
+  rangeListScp: document.querySelector('#publicRangeListScp'),
+  slotListScp: document.querySelector('#publicSlotListScp'),
+  rangeListJp: document.querySelector('#publicRangeListJp'),
+  slotListJp: document.querySelector('#publicSlotListJp'),
   importInput: document.querySelector('#publicImportInput'),
   loadButton: document.querySelector('#publicLoadButton'),
   pasteButton: document.querySelector('#publicPasteButton'),
   fileInput: document.querySelector('#publicFileInput'),
   clearButton: document.querySelector('#publicClearButton'),
-  archiveHint: document.querySelector('#publicArchiveHint'),
-  archiveList: document.querySelector('#publicArchiveList'),
   entryUrl: document.querySelector('#publicEntryUrl'),
   frame: document.querySelector('#publicArticleFrame'),
   attachmentList: document.querySelector('#publicAttachmentList'),
+  ratingScore: document.querySelector('#publicRatingScore'),
+  ratingMeta: document.querySelector('#publicRatingMeta'),
+  voteUpButton: document.querySelector('#publicVoteUpButton'),
+  voteDownButton: document.querySelector('#publicVoteDownButton'),
 };
 
-let library = null;
+const state = {
+  library: null,
+  activeRangeIndexBySeries: {
+    SCP: 0,
+    'SCP-JP': 0,
+  },
+  currentSlug: '',
+  currentPayload: null,
+  currentLibraryEntry: null,
+};
+
+function getArticlesBySeries(series = 'SCP') {
+  return (state.library?.articles || []).filter((article) => String(article.series || 'SCP') === series);
+}
 
 function setStatus(message, type = 'info') {
   refs.status.textContent = message;
@@ -63,6 +92,16 @@ function getMetaDescription() {
   return meta;
 }
 
+function updateNamedMeta(attribute, name, content) {
+  let meta = document.querySelector(`meta[${attribute}="${name}"]`);
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute(attribute, name);
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', content);
+}
+
 function stripPreviewText(value = '') {
   return String(value || '')
     .replace(/\[\[[^\]]+\]\]/g, ' ')
@@ -75,6 +114,11 @@ function syncMetadata({ title, description, canonicalUrl }) {
   document.title = title;
   getMetaDescription().setAttribute('content', description);
   getCanonicalLink().setAttribute('href', canonicalUrl);
+  updateNamedMeta('property', 'og:title', title);
+  updateNamedMeta('property', 'og:description', description);
+  updateNamedMeta('property', 'og:url', canonicalUrl);
+  updateNamedMeta('name', 'twitter:title', title);
+  updateNamedMeta('name', 'twitter:description', description);
 }
 
 function readPublicTokenCache() {
@@ -108,10 +152,64 @@ function getCachedPublicToken(slug) {
   return String(readPublicTokenCache()?.[slug]?.token || '').trim();
 }
 
+function readVoteCache() {
+  const cache = safeParseJSON(localStorage.getItem(PUBLIC_VOTE_CACHE_KEY) || '', null);
+  return cache && typeof cache === 'object' ? cache : {};
+}
+
+function writeVoteCache(cache) {
+  localStorage.setItem(PUBLIC_VOTE_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getVoteRecord(slug) {
+  return String(readVoteCache()?.[slug] || '');
+}
+
+function setVoteRecord(slug, value) {
+  const cache = readVoteCache();
+  cache[slug] = value;
+  writeVoteCache(cache);
+}
+
+function findLibraryEntry(slug = '') {
+  return state.library?.articles?.find((entry) => entry.slug === slug) || null;
+}
+
+function buildRatingSnapshot(source = {}, slug = '') {
+  const base = getArticleRatingSnapshot(source);
+  const localVote = getVoteRecord(slug);
+  const up = base.up + (localVote === 'up' ? 1 : 0);
+  const down = base.down + (localVote === 'down' ? 1 : 0);
+  return {
+    up,
+    down,
+    score: up - down,
+  };
+}
+
+function renderRating() {
+  const snapshot = buildRatingSnapshot(
+    state.currentLibraryEntry?.ratingScore !== undefined
+      ? state.currentLibraryEntry
+      : state.currentPayload?.article || {},
+    state.currentSlug,
+  );
+  const localVote = state.currentSlug ? getVoteRecord(state.currentSlug) : '';
+  refs.ratingScore.textContent = `評価 ${snapshot.score >= 0 ? '+' : ''}${snapshot.score}`;
+  refs.ratingMeta.textContent = `賛成 ${snapshot.up} / 反対 ${snapshot.down}`;
+  refs.voteUpButton.disabled = !state.currentSlug || Boolean(localVote);
+  refs.voteDownButton.disabled = !state.currentSlug || Boolean(localVote);
+}
+
 function resetSurface() {
+  state.currentSlug = '';
+  state.currentPayload = null;
+  state.currentLibraryEntry = null;
+
   syncMetadata({
     title: 'Sandwich Box Archive',
-    description: '短いURLと広いレイアウトで読める公開アーカイブ。',
+    description:
+      '公開された SCP 図鑑を短いURLで一覧・閲覧できる公開アーカイブ。スマホでも見やすく、検索エンジンにも載りやすい構成です。',
     canonicalUrl: getPublicHomeUrl(window.location.href),
   });
 
@@ -121,13 +219,15 @@ function resetSurface() {
   refs.author.textContent = 'Author: Sandwich Box';
   refs.source.textContent = 'Source: Static Archive';
   refs.summary.textContent =
-    '公開一覧からそのまま読める静的アーカイブです。共有コードや共有URLの貼り付けにも対応しつつ、別端末からは一覧ベースで素早く閲覧できます。';
+    '公開済みの記事をここからすぐ読めます。番号一覧から開くことも、共有URLや共有コードを読み込むこともできます。';
   refs.attachmentList.innerHTML = '<p class="empty-state">添付画像はありません。</p>';
+  refs.importInput.value = '';
+  renderRating();
 
   mountSandboxedArticleFrame(refs.frame, {
     title: 'Sandwich Box Public Reader',
     articleHtml:
-      '<p class="empty-preview">一覧から記事を選ぶか、共有URL・共有コードを読み込むと本文がここに表示されます。</p>',
+      '<p class="empty-preview">一覧から記事を選ぶか、共有URLや共有コードを読み込むと本文がここに表示されます。</p>',
     badgeText: 'Public Runtime',
   });
 }
@@ -156,6 +256,86 @@ function renderAttachments(attachments) {
   });
 }
 
+function renderArchiveStats() {
+  refs.archiveStats.innerHTML = '';
+  const total = Number(state.library?.articles?.length || 0);
+  const ranges = createCatalogRanges({ size: RANGE_SIZE });
+  const scpArticles = getArticlesBySeries('SCP');
+  const firstOpenRange = ranges.find((range) => buildCatalogRangeSummary(scpArticles, range).empty > 0);
+  const jpCount = getArticlesBySeries('SCP-JP').length;
+
+  [
+    ['公開記事', String(total)],
+    ['SCP-JP', String(jpCount)],
+    ['表示範囲', '001-10000'],
+    ['最初の空き', firstOpenRange ? firstOpenRange.label : 'なし'],
+    ['スマホ対応', '対応済み'],
+  ].forEach(([label, value]) => {
+    const card = document.createElement('div');
+    card.className = 'stats-pill';
+    card.innerHTML = `<span class="muted-text">${label}</span><strong>${value}</strong>`;
+    refs.archiveStats.appendChild(card);
+  });
+}
+
+function renderRangeListForSeries(series, container) {
+  container.innerHTML = '';
+  const ranges = createCatalogRanges({ size: RANGE_SIZE });
+  const articles = getArticlesBySeries(series);
+  ranges.forEach((range, index) => {
+    const summary = buildCatalogRangeSummary(articles, range);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'range-item';
+    button.dataset.series = series;
+    button.dataset.rangeIndex = String(index);
+    button.classList.toggle('is-active', index === (state.activeRangeIndexBySeries[series] || 0));
+    button.innerHTML = `<strong>${range.label}</strong><span class="muted-text">${summary.filled} 件 / 空き ${summary.empty}</span>`;
+    container.appendChild(button);
+  });
+}
+
+function renderRangeLists() {
+  renderRangeListForSeries('SCP', refs.rangeListScp);
+  renderRangeListForSeries('SCP-JP', refs.rangeListJp);
+}
+
+function renderSlotListForSeries(series, container) {
+  container.innerHTML = '';
+  const ranges = createCatalogRanges({ size: RANGE_SIZE });
+  const activeRangeIndex = state.activeRangeIndexBySeries[series] || 0;
+  const range = ranges[activeRangeIndex] || ranges[0];
+  const summary = buildCatalogRangeSummary(getArticlesBySeries(series), range);
+
+  summary.items.forEach((entry) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `slot-item ${entry.article ? 'is-filled' : 'is-empty'}`;
+    button.dataset.series = series;
+    button.dataset.slug = entry.article?.slug || '';
+    button.disabled = !entry.article;
+
+    const title = document.createElement('strong');
+    title.textContent = entry.article
+      ? `${formatArticleSlot(entry.number)} ${entry.article.title}`
+      : `${formatArticleSlot(entry.number)} [未公開]`;
+
+    const meta = document.createElement('span');
+    meta.className = 'muted-text';
+    meta.textContent = entry.article
+      ? `${buildArticleDesignation(entry.article)} / ${entry.article.objectClass || '--'}`
+      : `${series} / 未登録`;
+
+    button.append(title, meta);
+    container.appendChild(button);
+  });
+}
+
+function renderSlotLists() {
+  renderSlotListForSeries('SCP', refs.slotListScp);
+  renderSlotListForSeries('SCP-JP', refs.slotListJp);
+}
+
 function renderPayload(payload, sourceLabel, { slug = '' } = {}) {
   const designation = buildArticleDesignation(payload.article);
   const articleSlug = slug || buildArticleSlug(payload.article);
@@ -165,8 +345,12 @@ function renderPayload(payload, sourceLabel, { slug = '' } = {}) {
     stripPreviewText(payload.article.content).slice(0, 150) ||
     '公開記事の本文を表示しています。';
 
+  state.currentSlug = articleSlug;
+  state.currentPayload = payload;
+  state.currentLibraryEntry = findLibraryEntry(articleSlug);
+
   syncMetadata({
-    title: `${payload.article.title} | Sandwich Box`,
+    title: `${designation} | ${payload.article.title} | Sandwich Box`,
     description: summary,
     canonicalUrl: buildPublicArticleUrl(articleSlug, {
       currentUrl: window.location.href,
@@ -193,48 +377,24 @@ function renderPayload(payload, sourceLabel, { slug = '' } = {}) {
   });
 
   renderAttachments(payload.attachments);
-}
-
-function renderArchiveList(list) {
-  refs.archiveList.innerHTML = '';
-
-  if (!list.length) {
-    refs.archiveList.innerHTML = '<p class="empty-state">公開記事はまだありません。</p>';
-    return;
-  }
-
-  list.forEach((article) => {
-    const slug = article.slug || buildArticleSlug(article);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'archive-item';
-    button.dataset.slug = slug;
-
-    const title = document.createElement('strong');
-    title.textContent = article.designation || article.title;
-
-    const meta = document.createElement('span');
-    meta.className = 'muted-text';
-    meta.textContent = `${article.title} / /p/${slug}`;
-
-    button.append(title, meta);
-    refs.archiveList.appendChild(button);
-  });
+  renderRating();
 }
 
 async function fetchLibrary() {
-  if (library) {
-    return library;
+  if (state.library) {
+    return state.library;
   }
 
   const response = await fetch(LIBRARY_URL, { cache: 'no-store' });
   if (!response.ok) {
-    throw new Error('公開一覧を取得できませんでした。');
+    throw new Error('公開一覧の取得に失敗しました。');
   }
 
-  library = await response.json();
-  renderArchiveList(Array.isArray(library?.articles) ? library.articles : []);
-  return library;
+  state.library = await response.json();
+  renderArchiveStats();
+  renderRangeLists();
+  renderSlotLists();
+  return state.library;
 }
 
 async function fetchStaticArticle(slug) {
@@ -273,7 +433,7 @@ function renderTokenText(text, sourceLabel, { slug = '', keepCleanUrl = false } 
 async function loadImportText(text, sourceLabel) {
   const normalizedText = String(text || '').trim();
   if (!normalizedText) {
-    throw new Error('公開URLまたは共有コードを入力してください。');
+    throw new Error('共有URLまたは共有コードを入力してください。');
   }
 
   const token = extractPublicTokenFromText(normalizedText);
@@ -295,14 +455,14 @@ async function handlePaste() {
   try {
     const text = await readClipboardText();
     if (!text.trim()) {
-      setStatus('クリップボードに共有データが見つかりませんでした。', 'warning');
+      setStatus('クリップボードに共有データが見つかりません。', 'warning');
       return;
     }
 
     refs.importInput.value = text;
     await loadImportText(text, 'Clipboard');
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'クリップボードの読み取りに失敗しました。', 'error');
+    setStatus(error instanceof Error ? error.message : '貼り付け読込に失敗しました。', 'error');
   }
 }
 
@@ -316,57 +476,103 @@ async function handleFile(file) {
     refs.importInput.value = text;
     await loadImportText(text, 'Public File');
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : '公開ファイルの読み込みに失敗しました。', 'error');
+    setStatus(error instanceof Error ? error.message : '共有ファイルの読込に失敗しました。', 'error');
   }
 }
 
 async function handleManualLoad() {
   const text = refs.importInput.value.trim();
   if (!text) {
-    setStatus('公開URLまたは共有コードを入力してください。', 'warning');
+    setStatus('共有URLまたは共有コードを入力してください。', 'warning');
     return;
   }
 
   try {
     await loadImportText(text, 'Manual Import');
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : '公開データの読み込みに失敗しました。', 'error');
+    setStatus(error instanceof Error ? error.message : '共有データの読込に失敗しました。', 'error');
   }
 }
 
 function handleClear() {
-  refs.importInput.value = '';
   history.replaceState(null, '', '/');
   resetSurface();
-  setStatus('入力をクリアしました。', 'info');
+  setStatus('表示をクリアしました。', 'info');
+}
+
+function handleVote(type) {
+  if (!state.currentSlug) {
+    return;
+  }
+
+  const existing = getVoteRecord(state.currentSlug);
+  if (existing) {
+    setStatus('この端末ではすでに評価済みです。', 'warning');
+    renderRating();
+    return;
+  }
+
+  setVoteRecord(state.currentSlug, type);
+  renderRating();
+  setStatus('この端末のローカル評価を保存しました。', 'success');
 }
 
 function setupActions() {
   refs.loadButton.addEventListener('click', handleManualLoad);
   refs.pasteButton.addEventListener('click', handlePaste);
   refs.clearButton.addEventListener('click', handleClear);
+  refs.voteUpButton.addEventListener('click', () => handleVote('up'));
+  refs.voteDownButton.addEventListener('click', () => handleVote('down'));
   refs.fileInput.addEventListener('change', (event) => {
     handleFile(event.target.files?.[0]);
     event.target.value = '';
   });
-  refs.archiveList.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-slug]');
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-range-index]');
     if (!button) {
       return;
     }
+    const series = String(button.dataset.series || 'SCP');
+    state.activeRangeIndexBySeries[series] = Number(button.dataset.rangeIndex) || 0;
+    renderRangeLists();
+    renderSlotLists();
+  });
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-slug]');
+    const slug = String(button?.dataset?.slug || '');
+    if (!slug) {
+      return;
+    }
 
-    renderStaticSlug(button.dataset.slug).catch((error) => {
-      const cachedToken = getCachedPublicToken(button.dataset.slug);
+    renderStaticSlug(slug).catch((error) => {
+      const cachedToken = getCachedPublicToken(slug);
       if (cachedToken) {
         renderTokenText(cachedToken, 'Saved Public Link', {
-          slug: button.dataset.slug,
+          slug,
           keepCleanUrl: true,
         });
         return;
       }
-      setStatus(error instanceof Error ? error.message : '公開アーカイブの読み込みに失敗しました。', 'error');
+      setStatus(error instanceof Error ? error.message : '公開記事の読込に失敗しました。', 'error');
     });
   });
+}
+
+function focusRangeForSlug(slug = '') {
+  const article = findLibraryEntry(slug);
+  if (!article?.articleNumber) {
+    return;
+  }
+
+  const series = String(article.series || 'SCP');
+  state.activeRangeIndexBySeries[series] = Math.max(0, Math.floor((article.articleNumber - 1) / RANGE_SIZE));
+  renderRangeLists();
+  renderSlotLists();
+}
+
+function isArchiveLandingPath(pathname = window.location.pathname) {
+  const normalizedPath = String(pathname || '').replace(/\/+$/g, '') || '/';
+  return normalizedPath === '/' || normalizedPath === '/archive' || normalizedPath === '/archive/index.html';
 }
 
 async function init() {
@@ -381,30 +587,31 @@ async function init() {
       loadedLibrary?.articles?.[0]?.slug ||
       '';
 
-    if (featuredSlug && window.location.pathname === '/') {
+    if (featuredSlug && isArchiveLandingPath(window.location.pathname)) {
+      focusRangeForSlug(featuredSlug);
       await renderStaticSlug(featuredSlug);
     }
   } catch (error) {
-    refs.archiveHint.textContent = `公開一覧の読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    setStatus(error instanceof Error ? error.message : '公開一覧の取得に失敗しました。', 'error');
   }
 
   try {
     const route = readPublicRoute(window.location);
     if (route.mode === 'token') {
-      renderTokenText(route.value, 'Direct Public URL', {
-        slug: route.slug,
-      });
+      focusRangeForSlug(route.slug);
+      renderTokenText(route.value, 'Direct Public URL', { slug: route.slug });
       return;
     }
 
     if (route.mode === 'slug') {
+      focusRangeForSlug(route.value);
       await renderStaticSlug(route.value);
       return;
     }
 
     setStatus('公開一覧または共有コードから記事を選択してください。', 'info');
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : '公開記事の読み込みに失敗しました。', 'error');
+    setStatus(error instanceof Error ? error.message : '公開記事の読込に失敗しました。', 'error');
   }
 }
 
